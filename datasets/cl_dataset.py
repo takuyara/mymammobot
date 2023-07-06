@@ -6,6 +6,9 @@ from copy import deepcopy
 import torch
 from torch.utils.data import Dataset
 
+import warnings
+warnings.filterwarnings("ignore", category = UserWarning)
+
 class CLDataset(Dataset):
 	def __init__(self, base_dir, dir_list, length, spacing, transform_img = None, transform_pos = None):
 		super(CLDataset, self).__init__()
