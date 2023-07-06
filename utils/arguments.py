@@ -12,6 +12,7 @@ def get_base_parser(parser):
 	parser.add_argument("--img-size", type = int, default = 224, help = "The input image size.")
 	parser.add_argument("-nw", "--num-workers", type = int, default = 4, help = "The number of workers.")
 	parser.add_argument("-d", "--device", type = str, default = "cuda", help = "The GPU device name.")
+	parser.add_argument("--save-path", type = str, default = "./checkpoints", help = "The base directory to save weights file.")
 	return parser
 
 def get_r3d_parser(parser):
