@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from PIL import Image
+from copy import deepcopy
 
 import torch
 from torch.utils.data import Dataset
@@ -15,7 +16,8 @@ class CLDataset(Dataset):
 			file_imgs, file_poses = [], []
 			for this_file in os.listdir(this_dir):
 				if this_file.endswith(".color.png"):
-					file_imgs.append(Image.open(os.path.join(this_dir, this_file)))
+					this_img = Image.open(os.path.join(this_dir, this_file))
+					file_imgs.append(deepcopy(this_img))
 				elif this_file.endswith(".pose.txt"):
 					this_pose = np.loadtxt(os.path.join(this_dir, this_file))
 					this_trans = this_pose.reshape(4, 4)[ : 3, 3]

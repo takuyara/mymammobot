@@ -47,7 +47,7 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, dataloaders, optim
 				if b_id % 50 == 0:
 					print(i, phase, b_id, sum_loss / num_loss)
 			t_loss = sum_loss / num_loss
-			print("Epoch {} {} done. Avg loss = {.5f}".format(b_id, phase, t_loss))
+			print("Epoch {} {} done. Avg loss = {.5f}".format(b_id, phase, t_loss), flush = True)
 			if phase == "val" and t_loss < min_loss:
 				min_loss, min_epoch, best_state_dict = t_loss, i, deepcopy(model_fuse_predictor.state_dict())
 	print("Min loss {.5f} occured at epoch {}".format(min_loss, min_epoch))
