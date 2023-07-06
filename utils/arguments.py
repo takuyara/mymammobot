@@ -3,7 +3,7 @@ def get_base_parser(parser):
 	parser.add_argument("--base-dir", type = str, default = "E:\\nn-data\\MAMMOBOT\\data\\7Scenes\\CTCLDepthfiles", help = "The base dataset dir.")
 	parser.add_argument("--train-split", type = str, default = "E:\\nn-data\\MAMMOBOT\\data\\7Scenes\\CTCLDepthfiles\\trains1.txt", help = "The path to train set split.")
 	parser.add_argument("--val-split", type = str, default = "E:\\nn-data\\MAMMOBOT\\data\\7Scenes\\CTCLDepthfiles\\tests1.txt", help = "The path to val set split.")
-	parser.add_argument("-lr", "--learning-rate", type = float, default = 1e-4, help = "The learning rate.")
+	parser.add_argument("-lr", "--learning-rate", type = float, default = 1e-3, help = "The learning rate.")
 	parser.add_argument("-e", "--epochs", type = int, default = 20, help = "The number of epochs for training.")
 	parser.add_argument("-b", "--batch-size", type = int, default = 32, help = "The batch size.")
 	parser.add_argument("-od", "--output-dim", type = int, default = 6, help = "The output dimension to the fc layer.")
