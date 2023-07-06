@@ -35,7 +35,7 @@ def train_val(model, dataloaders, optimiser, epochs, device):
 				sum_loss += loss.item()
 				num_loss += 1
 			t_loss = sum_loss / num_loss
-			print("Epoch {} {} done. Avg loss = {:.5f}".format(b_id, phase, t_loss). flush = True)
+			print("Epoch {} {} done. Avg loss = {:.5f}".format(i, phase, t_loss). flush = True)
 			if phase == "val" and t_loss < min_loss:
 				min_loss, min_epoch, best_state_dict = t_loss, i, deepcopy(model.state_dict())
 	print("Min loss {:.5f} occured at epoch {}".format(min_loss, min_epoch))
