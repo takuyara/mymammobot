@@ -1,0 +1,1 @@
+vmtksurfacereader -ifile bronchiMesh.stl  --pipe vmtkcenterlines -ofile SiliconLungCL9.dat

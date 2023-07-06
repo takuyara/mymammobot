@@ -33,6 +33,7 @@ def train_val(model, dataloaders, optimiser, epochs, device):
 				num_loss += 1
 				if b_id % 10 == 0:
 					print(i, phase, b_id, sum_loss / num_loss)
+			print("Epoch {} {} done. Avg loss = {.5f}".format(b_id, phase, sum_loss / num_loss))
 
 def main():
 	args = get_args("r3d")

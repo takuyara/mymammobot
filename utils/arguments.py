@@ -23,7 +23,10 @@ def get_r3d_parser(parser):
 def get_hisenc_parser(parser):
 	parser.add_argument("--dropout", type = float, default = 0.5, help = "The dropout rate for AtLoc.")
 	parser.add_argument("--feature-dim", type = int, default = 2048, help = "The feature dim for AtLoc.")
-	parser.add_argument("--pretrained-path", type = str, default = "./pretrained/r3d18_KM_200ep.pth", help = "The pretrained file path.")
+	parser.add_argument("--pretrained-path", type = str, default = "./pretrained/epoch_045.pth.tar", help = "The pretrained file path.")
+	parser.add_argument("--hidden-size", type = int, default = 512, help = "The hidden size of LSTM.")
+	parser.add_argument("--num-layers", type = int, default = 2, help = "The number of layers for LSTM.")
+	parser.add_argument("--mlp-neurons", type = int, nargs = "+", default = [512, 256], help = "The number of neurons for each MLP layer (excluding the last prediction one).")
 	return parser
 
 def get_args(*reqs):

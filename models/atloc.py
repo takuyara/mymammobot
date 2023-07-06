@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init
-from network.att import AttentionBlock
+from models.att import AttentionBlock
 
 class FourDirectionalLSTM(nn.Module):
     def __init__(self, seq_size, origin_feat_size, hidden_size):
