@@ -30,6 +30,13 @@ def get_hisenc_parser(parser):
 	parser.add_argument("--mlp-neurons", type = int, nargs = "+", default = [512, 256], help = "The number of neurons for each MLP layer (excluding the last prediction one).")
 	return parser
 
+def get_hispred_parser(parser):
+	parser.add_argument("--pretrained-hisenc-path", type = str, default = "./checkpoints/hisenc_fuser.pth", help = "The path to the history encoder weights.")
+	parser.add_argument("--mlp-branch-his", type = int, nargs = "+", default = [512, 256], help = "The MLP neurons for branch before fusion for history encoding.")
+	parser.add_argument("--mlp-branch-cur", type = int, nargs = "+", default = [1024, 512, 256], help = "The MLP neurons for branch before fusion for image encoding.")
+	parser.add_argument("--mlp-final", type = int, nargs = "+", default = [512, 256, 128], help = "The MLP neurons for final prediction.")
+	return parser
+
 def get_args(*reqs):
 	parser = argparse.ArgumentParser()
 	parser = get_base_parser(parser)
@@ -38,4 +45,6 @@ def get_args(*reqs):
 			parser = get_r3d_parser(parser)
 		elif req == "hisenc":
 			parser = get_hisenc_parser(parser)
+		elif req == "hispred":
+			parser = get_hispred_parser(parser)
 	return parser.parse_args()

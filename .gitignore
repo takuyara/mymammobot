@@ -153,3 +153,5 @@ cython_debug/
 velocity_analysis
 pretrained/*
 meshes/*
+checkpoints/*
+
