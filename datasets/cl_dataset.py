@@ -17,18 +17,16 @@ class CLDataset(Dataset):
 		for this_dir in dir_list:
 			this_dir = os.path.join(base_dir, this_dir)
 			file_imgs, file_poses = [], []
-			print(this_dir, os.listdir(this_dir), flush = True)
-			continue
-			for this_file in os.listdir(this_dir):
-				if this_file.endswith(".color.png"):
-					this_img = Image.open(os.path.join(this_dir, this_file))
-					file_imgs.append(deepcopy(this_img))
-				elif this_file.endswith(".pose.txt"):
-					this_pose = np.loadtxt(os.path.join(this_dir, this_file))
-					this_trans = this_pose.reshape(4, 4)[ : 3, 3]
-					this_rot = np.zeros(3)
-					this_pose = np.concatenate([this_trans, this_rot])
-					file_poses.append(this_pose)
+			for i in range(len(os.listdir(this_dir)) // 2):
+				this_file = f"frame-{i:06d}.color.png"
+				this_img = Image.open(os.path.join(this_dir, this_file))
+				file_imgs.append(deepcopy(this_img))
+				this_file = f"frame-{i:06d}.pose.txt"
+				this_pose = np.loadtxt(os.path.join(this_dir, this_file))
+				this_trans = this_pose.reshape(4, 4)[ : 3, 3]
+				this_rot = np.zeros(3)
+				this_pose = np.concatenate([this_trans, this_rot])
+				file_poses.append(this_pose)
 			for i in range(len(file_imgs) - 1):
 				indices = [i + 1] + [max(i - j * spacing, 0) for j in range(length)]
 				indices.reverse()
