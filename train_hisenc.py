@@ -32,7 +32,7 @@ def train_val(model_atloc, model_fuser, dataloaders, optimiser, epochs, device):
 					poses_true = poses[ : , -1, ...]
 					bs, sqlen, C, W, H = tuple(imgs_history.shape)
 					imgs_history = imgs_history.reshape(bs * sqlen, C, W, H)
-					imgs_history = model_atloc(imgs_history, get_encode = True)
+					imgs_history = model_atloc(imgs_history, get_encode = True).detach()
 					imgs_history = imgs_history.reshape(bs, sqlen, imgs_history.size(1))
 					poses_pred = model_fuser(imgs_history, poses_history)
 					loss = nn.MSELoss()(poses_true, poses_pred)

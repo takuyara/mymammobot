@@ -36,7 +36,8 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, dataloaders, optim
 					imgs_encode = model_atloc(imgs, get_encode = True)
 					imgs_encode = imgs_encode.reshape(bs, sqlen, imgs_encode.size(1))
 					history_encode, current_encode = imgs_encode[ : , : -1, : ], imgs_encode[ : , -1, : ]
-					history_encode = model_fuser(history_encode, poses_history, get_encode = True)
+					history_encode = model_fuser(history_encode, poses_history, get_encode = True).detach()
+					current_encode = current_encode.detach()
 					poses_pred = model_fuse_predictor(history_encode, current_encode)
 					loss = nn.MSELoss()(poses_true, poses_pred)
 				if phase == "train":
