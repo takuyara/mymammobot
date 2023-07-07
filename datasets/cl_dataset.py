@@ -17,6 +17,8 @@ class CLDataset(Dataset):
 		for this_dir in dir_list:
 			this_dir = os.path.join(base_dir, this_dir)
 			file_imgs, file_poses = [], []
+			print(this_dir, os.listdir(this_dir), flush = True)
+			continue
 			for this_file in os.listdir(this_dir):
 				if this_file.endswith(".color.png"):
 					this_img = Image.open(os.path.join(this_dir, this_file))
