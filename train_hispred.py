@@ -64,7 +64,7 @@ def main():
 	model_atloc.load_state_dict(torch.load(args.pretrained_path)["model_state_dict"])
 	model_fuser = LSTMFuser(args.length, args.feature_dim, args.output_dim, args.hidden_size, args.num_layers, args.mlp_neurons, args.output_dim, args.dropout).to(device)
 	model_fuser.load_state_dict(torch.load(args.pretrained_hisenc_path))
-	model_fuse_predictor = MLPFusePredictor(args.mlp_neurons[-1], args.feature_dim, args.mlp_branch_his, args.mlp_branch_cur, args.mlp_final, args.output_dim, args.dropout).to(device)
+	model_fuse_predictor = MLPFusePredictor(args.mlp_neurons[-1], args.feature_dim, args.mlp_branch_his, args.mlp_branch_cur, args.mlp_final, args.output_dim, args.dropout, args.fuse_mode).to(device)
 	optimiser = optim.Adam(model_fuse_predictor.parameters(), lr = args.learning_rate)
 	min_loss, min_epoch, best_state_dict = train_val(model_atloc, model_fuser, model_fuse_predictor, dataloaders, optimiser, args.epochs, device)
 	torch.save(best_state_dict, os.path.join(args.save_path, f"hisenc_fuse_predictor_{min_loss:.5f}.pth"))

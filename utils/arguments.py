@@ -35,6 +35,7 @@ def get_hispred_parser(parser):
 	parser.add_argument("--mlp-branch-his", type = int, nargs = "+", default = [512, 256], help = "The MLP neurons for branch before fusion for history encoding.")
 	parser.add_argument("--mlp-branch-cur", type = int, nargs = "+", default = [1024, 512, 256], help = "The MLP neurons for branch before fusion for image encoding.")
 	parser.add_argument("--mlp-final", type = int, nargs = "+", default = [512, 256, 128], help = "The MLP neurons for final prediction.")
+	parser.add_argument("--fuse-mode", type = str, default = "cat", choices = ["cat", "plus"], help = "The fuse mode for 2 input features.")
 	return parser
 
 def get_args(*reqs):
