@@ -1,6 +1,6 @@
 import argparse
 def get_base_parser(parser):
-	parser.add_argument("--base-dir", type = str, default = "E:\\nn-data\\MAMMOBOT\\data\\7Scenes\\CTCLDepthfiles", help = "The base dataset dir.")
+	parser.add_argument("--base-dir", type = str, default = "./depth-images", help = "The base dataset dir.")
 	parser.add_argument("--train-split", type = str, default = "trains1.txt", help = "The path to train set split.")
 	parser.add_argument("--val-split", type = str, default = "tests1.txt", help = "The path to val set split.")
 	parser.add_argument("-lr", "--learning-rate", type = float, default = 1e-3, help = "The learning rate.")

@@ -155,4 +155,4 @@ pretrained/*
 meshes/*
 checkpoints/*
 CL
-depths-images
+depth-images

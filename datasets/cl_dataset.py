@@ -22,7 +22,7 @@ class CLDataset(Dataset):
 			for i in range(len(os.listdir(this_dir)) // 2):
 				#this_file = f"frame-{i:06d}.color.png"
 				this_file = f"{i:06d}.png"
-				this_img = Image.open(os.path.join(this_dir, this_file))
+				this_img = Image.open(os.path.join(this_dir, this_file)).convert("RGB")
 				file_imgs.append(deepcopy(this_img))
 				#this_file = f"frame-{i:06d}.pose.txt"
 				this_file = f"{i:06d}.txt"
@@ -32,7 +32,6 @@ class CLDataset(Dataset):
 			for i in range(len(file_imgs) - 1):
 				indices = [i + 1] + [max(i - j * spacing, 0) for j in range(length)]
 				indices.reverse()
-				xx = [j + len(all_imgs) for j in indices]
 				all_samples.append([j + len(all_imgs) for j in indices])
 			all_imgs.extend(file_imgs)
 			all_poses.extend(file_poses)

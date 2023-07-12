@@ -51,7 +51,7 @@ base_orientation = np.array([0, 0, 1])
 
 mesh_path = "./meshes/Airway_Phantom_AdjustSmooth.stl"
 cl_path = f"./CL/CL{cl_idx}.dat"
-img_path = f"./depths-images/CL{cl_idx}-fold{cur_fold}"
+img_path = f"./depth-images/CL{cl_idx}-fold{cur_fold}"
 rotation_path = "./relative_quats.npy"
 
 points = []
