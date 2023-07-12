@@ -1,8 +1,8 @@
 import argparse
 def get_base_parser(parser):
 	parser.add_argument("--base-dir", type = str, default = "E:\\nn-data\\MAMMOBOT\\data\\7Scenes\\CTCLDepthfiles", help = "The base dataset dir.")
-	parser.add_argument("--train-split", type = str, default = "E:\\nn-data\\MAMMOBOT\\data\\7Scenes\\CTCLDepthfiles\\trains1.txt", help = "The path to train set split.")
-	parser.add_argument("--val-split", type = str, default = "E:\\nn-data\\MAMMOBOT\\data\\7Scenes\\CTCLDepthfiles\\tests1.txt", help = "The path to val set split.")
+	parser.add_argument("--train-split", type = str, default = "trains1.txt", help = "The path to train set split.")
+	parser.add_argument("--val-split", type = str, default = "tests1.txt", help = "The path to val set split.")
 	parser.add_argument("-lr", "--learning-rate", type = float, default = 1e-3, help = "The learning rate.")
 	parser.add_argument("-e", "--epochs", type = int, default = 20, help = "The number of epochs for training.")
 	parser.add_argument("-b", "--batch-size", type = int, default = 32, help = "The batch size.")
@@ -21,9 +21,12 @@ def get_r3d_parser(parser):
 	parser.add_argument("--n-pretrained-classes", type = int, default = 1039, help = "The number of classes on the pretrained model.")
 	return parser
 
-def get_hisenc_parser(parser):
+def get_atloc_parser(parser):
 	parser.add_argument("--dropout", type = float, default = 0.5, help = "The dropout rate for AtLoc.")
 	parser.add_argument("--feature-dim", type = int, default = 2048, help = "The feature dim for AtLoc.")
+	return parser
+
+def get_hisenc_parser(parser):
 	parser.add_argument("--pretrained-path", type = str, default = "./pretrained/epoch_045.pth.tar", help = "The pretrained file path.")
 	parser.add_argument("--hidden-size", type = int, default = 512, help = "The hidden size of LSTM.")
 	parser.add_argument("--num-layers", type = int, default = 2, help = "The number of layers for LSTM.")
@@ -44,6 +47,8 @@ def get_args(*reqs):
 	for req in reqs:
 		if req == "r3d":
 			parser = get_r3d_parser(parser)
+		elif req == "atloc":
+			parser = get_atloc_parser(parser)
 		elif req == "hisenc":
 			parser = get_hisenc_parser(parser)
 		elif req == "hispred":

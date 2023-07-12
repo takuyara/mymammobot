@@ -54,7 +54,7 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, dataloaders, optim
 	return min_loss, min_epoch, best_state_dict
 
 def main():
-	args = get_args("hisenc", "hispred")
+	args = get_args("atloc", "hisenc", "hispred")
 	datasets = {phase : CLDataset(args.base_dir, get_dir_list(split_path), args.length, args.spacing,
 		get_img_transform(args), None) for phase, split_path in [("train", args.train_split), ("val", args.val_split)]}
 	dataloaders = {phase : DataLoader(ds, batch_size = args.batch_size,

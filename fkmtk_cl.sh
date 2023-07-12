@@ -1,0 +1,1 @@
+vmtksurfacereader -ifile ./meshes/Airway_Phantom_AdjustSmooth.stl --pipe vmtkcenterlines --pipe vmtkrenderer --pipe vmtksurfaceviewer -opacity 0.25 --pipe vmtksurfaceviewer -i @vmtkcenterlines.o -array MaximumInscribedSphereRadius -ofile CL$1.dat

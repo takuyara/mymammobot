@@ -154,4 +154,5 @@ velocity_analysis
 pretrained/*
 meshes/*
 checkpoints/*
-
+CL
+depths-images

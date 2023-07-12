@@ -6,6 +6,8 @@ from copy import deepcopy
 import torch
 from torch.utils.data import Dataset
 
+from utils.pose_utils import get_6dof_pose_label
+
 import warnings
 warnings.filterwarnings("ignore", category = UserWarning)
 
@@ -18,14 +20,14 @@ class CLDataset(Dataset):
 			this_dir = os.path.join(base_dir, this_dir)
 			file_imgs, file_poses = [], []
 			for i in range(len(os.listdir(this_dir)) // 2):
-				this_file = f"frame-{i:06d}.color.png"
+				#this_file = f"frame-{i:06d}.color.png"
+				this_file = f"{i:06d}.png"
 				this_img = Image.open(os.path.join(this_dir, this_file))
 				file_imgs.append(deepcopy(this_img))
-				this_file = f"frame-{i:06d}.pose.txt"
+				#this_file = f"frame-{i:06d}.pose.txt"
+				this_file = f"{i:06d}.txt"
 				this_pose = np.loadtxt(os.path.join(this_dir, this_file))
-				this_trans = this_pose.reshape(4, 4)[ : 3, 3]
-				this_rot = np.zeros(3)
-				this_pose = np.concatenate([this_trans, this_rot])
+				this_pose = get_6dof_pose_label(this_pose)
 				file_poses.append(this_pose)
 			for i in range(len(file_imgs) - 1):
 				indices = [i + 1] + [max(i - j * spacing, 0) for j in range(length)]
