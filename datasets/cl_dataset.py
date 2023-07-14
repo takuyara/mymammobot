@@ -11,31 +11,28 @@ from utils.pose_utils import get_6dof_pose_label
 import warnings
 warnings.filterwarnings("ignore", category = UserWarning)
 
+def load_single_file(path, idx):
+	this_file = f"{idx:06d}.png"
+	this_img = Image.open(os.path.join(path, this_file)).convert("RGB")
+	this_file = f"{idx:06d}.txt"
+	this_pose = np.loadtxt(os.path.join(path, this_file))
+	this_pose = get_6dof_pose_label(this_pose)
+	return this_img, this_pose
+
 class CLDataset(Dataset):
 	def __init__(self, base_dir, dir_list, length, spacing, transform_img = None, transform_pos = None):
 		super(CLDataset, self).__init__()
-		all_imgs, all_poses = [], []
-		all_samples = []
+		self.path_indices, self.samples = [], []
 		for this_dir in dir_list:
 			this_dir = os.path.join(base_dir, this_dir)
-			file_imgs, file_poses = [], []
+			this_path_indices = []
 			for i in range(len(os.listdir(this_dir)) // 2):
-				#this_file = f"frame-{i:06d}.color.png"
-				this_file = f"{i:06d}.png"
-				this_img = Image.open(os.path.join(this_dir, this_file)).convert("RGB")
-				file_imgs.append(deepcopy(this_img))
-				#this_file = f"frame-{i:06d}.pose.txt"
-				this_file = f"{i:06d}.txt"
-				this_pose = np.loadtxt(os.path.join(this_dir, this_file))
-				this_pose = get_6dof_pose_label(this_pose)
-				file_poses.append(this_pose)
-			for i in range(len(file_imgs) - 1):
+				this_path_indices.append((this_dir, i))
+			for i in range(len(this_path_indices) - 1):
 				indices = [i + 1] + [max(i - j * spacing, 0) for j in range(length)]
 				indices.reverse()
-				all_samples.append([j + len(all_imgs) for j in indices])
-			all_imgs.extend(file_imgs)
-			all_poses.extend(file_poses)
-		self.imgs, self.poses, self.samples = all_imgs, all_poses, all_samples
+				self.samples.append([j + len(self.path_indices) for j in indices])
+			self.path_indices.extend(this_path_indices)
 		self.transform_img, self.transform_pos = transform_img, transform_pos
 	
 	def __len__(self):
@@ -44,7 +41,7 @@ class CLDataset(Dataset):
 	def __getitem__(self, idx):
 		input_img, input_pos = [], []
 		for i in self.samples[idx]:
-			img, pos = self.imgs[i], self.poses[i]
+			img, pos = load_single_file(*self.path_indices[i])
 			if self.transform_img is not None:
 				img = self.transform_img(img)
 			if self.transform_pos is not None:
