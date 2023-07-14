@@ -57,7 +57,7 @@ def main():
 		num_workers = args.num_workers, shuffle = phase == "train") for phase, ds in datasets.items()}
 	device = torch.device(args.device)
 	model_atloc = AtLoc(models.resnet34(pretrained = False), droprate = args.dropout, feat_dim = args.feature_dim).to(device)
-	model_atloc.load_state_dict(torch.load(args.pretrained_path)["model_state_dict"])
+	model_atloc.load_state_dict(torch.load(args.pretrained_path))
 	model_fuser = LSTMFuser(args.length, args.feature_dim, args.output_dim, args.hidden_size, args.num_layers, args.mlp_neurons, args.output_dim, args.dropout).to(device)
 	optimiser = optim.Adam(model_fuser.parameters(), lr = args.learning_rate)
 	min_loss, min_epoch, best_state_dict = train_val(model_atloc, model_fuser, dataloaders, optimiser, args.epochs, device)

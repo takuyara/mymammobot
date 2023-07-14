@@ -61,7 +61,7 @@ def main():
 		num_workers = args.num_workers, shuffle = phase == "train") for phase, ds in datasets.items()}
 	device = torch.device(args.device)
 	model_atloc = AtLoc(models.resnet34(pretrained = False), droprate = args.dropout, feat_dim = args.feature_dim).to(device)
-	model_atloc.load_state_dict(torch.load(args.pretrained_path)["model_state_dict"])
+	model_atloc.load_state_dict(torch.load(args.pretrained_path))
 	model_fuser = LSTMFuser(args.length, args.feature_dim, args.output_dim, args.hidden_size, args.num_layers, args.mlp_neurons, args.output_dim, args.dropout).to(device)
 	model_fuser.load_state_dict(torch.load(args.pretrained_hisenc_path))
 	model_fuse_predictor = MLPFusePredictor(args.mlp_neurons[-1], args.feature_dim, args.mlp_branch_his, args.mlp_branch_cur, args.mlp_final, args.output_dim, args.dropout, args.fuse_mode).to(device)
