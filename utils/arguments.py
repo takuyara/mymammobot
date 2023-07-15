@@ -66,4 +66,6 @@ def get_args(*reqs):
 			parser = get_fusepred_parser(parser)
 		elif req == "finalsel":
 			parser = get_finalsel_parser(parser)
+		elif req == "test":
+			parser = get_test_parser(parser)
 	return parser.parse_args()
