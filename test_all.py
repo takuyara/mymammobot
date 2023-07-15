@@ -36,11 +36,11 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 			bs, sqlen, C, W, H = tuple(imgs.shape)
 			imgs = imgs.reshape(bs * sqlen, C, W, H)
 			imgs_encode, atloc_pred = model_atloc(imgs, get_encode = True, return_both = True)
+			imgs_encode = imgs_encode.reshape(bs, sqlen, imgs_encode.size(1))
+			atloc_pred = atloc_pred.reshape(bs, sqlen, atloc_pred.size(1))[ : , -1, : ]
 			atloc_metric.add_batch(atloc_pred, poses_true)
 			if val_models < 2:
 				continue
-			imgs_encode = imgs_encode.reshape(bs, sqlen, imgs_encode.size(1))
-			atloc_pred = atloc_pred.reshape(bs, sqlen, atloc_pred.size(1))[ : , -1, : ]
 			history_encode, current_encode = imgs_encode[ : , : -1, : ], imgs_encode[ : , -1, : ]
 			history_encode, fuser_pred = model_fuser(history_encode, poses_history, get_encode = True, return_both = True)
 			hisenc_metric.add_batch(fuser_pred, poses_true)
