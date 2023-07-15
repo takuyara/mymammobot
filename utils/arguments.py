@@ -2,7 +2,7 @@ import argparse
 def get_base_parser(parser):
 	parser.add_argument("--base-dir", type = str, default = "./depth-images", help = "The base dataset dir.")
 	parser.add_argument("--train-split", type = str, default = "trains1.txt", help = "The path to train set split.")
-	parser.add_argument("--val-split", type = str, default = "tests1.txt", help = "The path to val set split.")
+	parser.add_argument("--val-split", type = str, default = "vals1.txt", help = "The path to val set split.")
 	parser.add_argument("-lr", "--learning-rate", type = float, default = 1e-3, help = "The learning rate.")
 	parser.add_argument("-e", "--epochs", type = int, default = 20, help = "The number of epochs for training.")
 	parser.add_argument("-b", "--batch-size", type = int, default = 32, help = "The batch size.")
@@ -29,14 +29,14 @@ def get_atloc_parser(parser):
 	return parser
 
 def get_hisenc_parser(parser):
-	parser.add_argument("--atloc-path", type = str, default = "./pretrained/epoch_045.pth.tar", help = "The pretrained file path.")
+	parser.add_argument("--atloc-path", type = str, default = None, help = "The pretrained file path.")
 	parser.add_argument("--hidden-size", type = int, default = 512, help = "The hidden size of LSTM.")
 	parser.add_argument("--num-layers", type = int, default = 2, help = "The number of layers for LSTM.")
 	parser.add_argument("--mlp-hisenc-out", type = int, nargs = "+", default = [512, 256], help = "The number of neurons for each MLP layer (excluding the last prediction one).")
 	return parser
 
 def get_fusepred_parser(parser):
-	parser.add_argument("--hisenc-path", type = str, default = "./checkpoints/hisenc_fuser.pth", help = "The path to the history encoder weights.")
+	parser.add_argument("--hisenc-path", type = str, default = None, help = "The path to the history encoder weights.")
 	parser.add_argument("--mlp-branch-his", type = int, nargs = "+", default = [512, 256], help = "The MLP neurons for branch before fusion for history encoding.")
 	parser.add_argument("--mlp-branch-cur", type = int, nargs = "+", default = [1024, 512, 256], help = "The MLP neurons for branch before fusion for image encoding.")
 	parser.add_argument("--mlp-fusepred-out", type = int, nargs = "+", default = [512, 256, 128], help = "The MLP neurons for final prediction.")
@@ -44,9 +44,13 @@ def get_fusepred_parser(parser):
 	return parser
 
 def get_finalsel_parser(parser):
-	parser.add_argument("--fusepred-path", type = str, default = "./checkpoints/fusepred.pth", help = "The path to the trained fusepred path.")
+	parser.add_argument("--fusepred-path", type = str, default = None, help = "The path to the trained fusepred path.")
 	parser.add_argument("--mlp-weighting", type = int, nargs = "+", default = [512, 1024], help = "The weighting layer size.")
 	return parser
+
+def get_test_parser(parser):
+	parser.add_argument("--finalsel-path", type = str, default = None, help = "The path to the final selection path.")
+	parser.add_argument("--test-split", type = str, default = "tests1.txt", help = "The path to test set (real images) split.")
 
 def get_args(*reqs):
 	parser = argparse.ArgumentParser()
