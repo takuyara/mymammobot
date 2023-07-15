@@ -16,7 +16,7 @@ from models.fuser import LSTMFuser
 from models.fuse_predictor import MLPFusePredictor
 from models.selector import MLPSelector
 
-def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloaders, pose_inv_trans, val_models, device):
+def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloader, pose_inv_trans, val_models, device):
 	model_atloc.eval()
 	model_fuser.eval()
 	model_fuse_predictor.eval()
