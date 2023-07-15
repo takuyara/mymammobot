@@ -34,7 +34,6 @@ def train_val(model, dataloaders, optimiser, epochs, pose_inv_trans, device):
 					loss.backward()
 					optimiser.step()
 				this_metric.add_batch(poses_true, poses_pred)
-				print(this_metric)
 			print("Epoch {} {} done. Metrics: {}".format(i, phase, this_metric), flush = True)
 			if phase == "val" and this_metric.loss() < min_loss:
 				min_loss, min_epoch, best_state_dict = this_metric.loss(), i, deepcopy(model.state_dict())
