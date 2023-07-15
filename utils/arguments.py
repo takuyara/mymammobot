@@ -14,6 +14,7 @@ def get_base_parser(parser):
 	parser.add_argument("-d", "--device", type = str, default = "cuda", help = "The GPU device name.")
 	parser.add_argument("--save-path", type = str, default = "./checkpoints", help = "The base directory to save weights file.")
 	parser.add_argument("--data-stats", type = str, default = "./data_stats.json", help = "The pose metadata file. Should contain mean and std for rotation and quaternion.")
+	parser.add_argument("--no-normalise", action = "store_true", default = False, help = "Whether stop pose normalisation.")
 	return parser
 
 def get_r3d_parser(parser):

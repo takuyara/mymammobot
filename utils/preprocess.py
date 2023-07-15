@@ -12,6 +12,8 @@ def get_img_transform(args):
 	return res
 
 def get_pose_transforms(args):
+	if args.no_normalise:
+		return lambda x : x, lambda x : x
 	stats = json.load(open(args.data_stats))
 	pose_mean, pose_std = np.array(stats["pose_mean"]), np.array(stats["pose_std"])
 	trans = lambda x : (x - pose_mean) / pose_std
