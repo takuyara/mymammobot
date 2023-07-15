@@ -22,6 +22,6 @@ class LSTMFuser(nn.Module):
 			if return_both:
 				return xc, out
 			else:
-				return out
+				return xc
 		else:
 			return out

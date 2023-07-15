@@ -60,7 +60,7 @@ def main():
 	args = get_args("atloc", "hisenc", "fusepred", "finalsel", "test")
 	pose_trans, pose_inv_trans = get_pose_transforms(args)
 	dataset = CLDataset(args.base_dir, get_dir_list(args.test_split), args.length, args.spacing, get_img_transform(args), pose_trans)
-	dataloader = DataLoader(ds, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
+	dataloader = DataLoader(dataset, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	device = torch.device(args.device)
 	val_models = 0
 	model_atloc = AtLoc(models.resnet34(pretrained = False), droprate = args.dropout, feat_dim = args.img_encode_dim).to(device)
