@@ -37,7 +37,7 @@ class Metrics:
 		inp, tgt = self.inv_trans(inp), self.inv_trans(tgt)
 		for i in range(len(inp)):
 			self.sum_trans_error += np.linalg.norm(inp[i, : 3] - tgt[i, : 3])
-			self.sum_rot_error += quat_angular_error(revert_quat(inp[i, 3 : ]), revert_quat(inp[i, 3 : ]))
+			self.sum_rot_error += quat_angular_error(revert_quat(inp[i, 3 : ]), revert_quat(tgt[i, 3 : ]))
 	def loss(self):
 		return self.sum_loss / self.n_samples
 	def get_dict(self):
