@@ -13,6 +13,7 @@ def get_base_parser(parser):
 	parser.add_argument("-nw", "--num-workers", type = int, default = 4, help = "The number of workers.")
 	parser.add_argument("-d", "--device", type = str, default = "cuda", help = "The GPU device name.")
 	parser.add_argument("--save-path", type = str, default = "./checkpoints", help = "The base directory to save weights file.")
+	parser.add_argument("--data-stats", type = str, default = "./data_stats.json", help = "The pose metadata file. Should contain mean and std for rotation and quaternion.")
 	return parser
 
 def get_r3d_parser(parser):
@@ -23,22 +24,27 @@ def get_r3d_parser(parser):
 
 def get_atloc_parser(parser):
 	parser.add_argument("--dropout", type = float, default = 0.5, help = "The dropout rate for AtLoc.")
-	parser.add_argument("--feature-dim", type = int, default = 2048, help = "The feature dim for AtLoc.")
+	parser.add_argument("--img-encode-dim", type = int, default = 2048, help = "The feature dim for AtLoc.")
 	return parser
 
 def get_hisenc_parser(parser):
-	parser.add_argument("--pretrained-path", type = str, default = "./pretrained/epoch_045.pth.tar", help = "The pretrained file path.")
+	parser.add_argument("--atloc-path", type = str, default = "./pretrained/epoch_045.pth.tar", help = "The pretrained file path.")
 	parser.add_argument("--hidden-size", type = int, default = 512, help = "The hidden size of LSTM.")
 	parser.add_argument("--num-layers", type = int, default = 2, help = "The number of layers for LSTM.")
-	parser.add_argument("--mlp-neurons", type = int, nargs = "+", default = [512, 256], help = "The number of neurons for each MLP layer (excluding the last prediction one).")
+	parser.add_argument("--mlp-hisenc-out", type = int, nargs = "+", default = [512, 256], help = "The number of neurons for each MLP layer (excluding the last prediction one).")
 	return parser
 
-def get_hispred_parser(parser):
-	parser.add_argument("--pretrained-hisenc-path", type = str, default = "./checkpoints/hisenc_fuser.pth", help = "The path to the history encoder weights.")
+def get_fusepred_parser(parser):
+	parser.add_argument("--hisenc-path", type = str, default = "./checkpoints/hisenc_fuser.pth", help = "The path to the history encoder weights.")
 	parser.add_argument("--mlp-branch-his", type = int, nargs = "+", default = [512, 256], help = "The MLP neurons for branch before fusion for history encoding.")
 	parser.add_argument("--mlp-branch-cur", type = int, nargs = "+", default = [1024, 512, 256], help = "The MLP neurons for branch before fusion for image encoding.")
-	parser.add_argument("--mlp-final", type = int, nargs = "+", default = [512, 256, 128], help = "The MLP neurons for final prediction.")
+	parser.add_argument("--mlp-fusepred-out", type = int, nargs = "+", default = [512, 256, 128], help = "The MLP neurons for final prediction.")
 	parser.add_argument("--fuse-mode", type = str, default = "cat", choices = ["cat", "plus"], help = "The fuse mode for 2 input features.")
+	return parser
+
+def get_finalsel_parser(parser):
+	parser.add_argument("--fusepred-path", type = str, default = "./checkpoints/fusepred.pth", help = "The path to the trained fusepred path.")
+	parser.add_argument("--mlp-weighting", type = int, nargs = "+", default = [512, 1024], help = "The weighting layer size.")
 	return parser
 
 def get_args(*reqs):
@@ -51,6 +57,8 @@ def get_args(*reqs):
 			parser = get_atloc_parser(parser)
 		elif req == "hisenc":
 			parser = get_hisenc_parser(parser)
-		elif req == "hispred":
-			parser = get_hispred_parser(parser)
+		elif req == "fusepred":
+			parser = get_fusepred_parser(parser)
+		elif req == "finalsel":
+			parser = get_finalsel_parser(parser)
 	return parser.parse_args()

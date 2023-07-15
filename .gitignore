@@ -156,3 +156,8 @@ meshes/*
 checkpoints/*
 CL
 depth-images
+depth-images-1
+velocity_norms.npy
+t1.txt
+*.zip
+emcoords.csv

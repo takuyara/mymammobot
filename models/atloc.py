@@ -64,7 +64,7 @@ class AtLoc(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias.data, 0)
 
-    def forward(self, x, get_encode = False):
+    def forward(self, x, get_encode = False, return_both = False):
         x = self.feature_extractor(x)
         x = F.relu(x)
 
@@ -78,10 +78,14 @@ class AtLoc(nn.Module):
 
         xyz = self.fc_xyz(x)
         wpqr = self.fc_wpqr(x)
-        if not get_encode:
-            return torch.cat((xyz, wpqr), 1)
+        out = torch.cat((xyz, wpqr), 1)
+        if get_encode:
+            if return_both:
+                return x, out
+            else:
+                return x
         else:
-            return x
+            return out
 
 class AtLocPlus(nn.Module):
     def __init__(self, atlocplus):

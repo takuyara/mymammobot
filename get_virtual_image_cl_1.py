@@ -41,13 +41,14 @@ min_d, max_d = 1.2504748, 143.0871
 clip_value = 120
 window_size = 41
 polyorder = 3
-focal_length = 5
+focal_length = 214
 cl_idx = int(sys.argv[1])
 cur_fold = int(sys.argv[2])
-move_rate = 0.2
+move_rate = 0.3
 reset_step = 5
-rot_euler_angle = 3
-base_orientation = np.array([0, 0, 1])
+rot_euler_angle = 5
+clipping_range = (1, 200)
+base_orientation = np.array([1, 1, 1])
 
 mesh_path = "./meshes/Airway_Phantom_AdjustSmooth.stl"
 cl_path = f"./CL/CL{cl_idx}.dat"
@@ -103,12 +104,14 @@ surface = pv.read(mesh_path)
 p = pv.Plotter(off_screen = True)
 p.add_mesh(surface)
 camera = pv.Camera()
+camera.clipping_range = clipping_range
 os.makedirs(img_path, exist_ok = True)
 
 for i in range(len(positions)):
 	#quaternion = R.align_vectors(base_orientation.reshape(1, 3), orientations[i].reshape(1, 3))[0].as_quat()
 	#quaternion = R.from_matrix(rotation_matrix_from_vectors(base_orientation, orientations[i])).as_quat()
 	quaternion = compute_rotation_quaternion(base_orientation, orientations[i])
+	#print(orientations[i], quaternion)
 	camera.position = positions[i]
 	camera.focal_point = focal_length * orientations[i] + camera.position
 	p.camera = camera

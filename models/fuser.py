@@ -10,7 +10,7 @@ class LSTMFuser(nn.Module):
 		self.mlp, prev_features = get_mlp(2 * hidden_size * num_layers, mlp_neurons, dropout)
 		self.fc = nn.Linear(prev_features, output_dim)
 
-	def forward(self, x1, x2, get_encode = False):
+	def forward(self, x1, x2, get_encode = False, return_both = False):
 		_, (x1, __) = self.lstm1(x1)
 		_, (x2, __) = self.lstm2(x2)
 		x1, x2 = x1.swapaxes(0, 1), x2.swapaxes(0, 1)
@@ -19,6 +19,9 @@ class LSTMFuser(nn.Module):
 		xc = self.mlp(xc)
 		out = self.fc(xc)
 		if get_encode:
-			return xc
+			if return_both:
+				return xc, out
+			else:
+				return out
 		else:
 			return out
