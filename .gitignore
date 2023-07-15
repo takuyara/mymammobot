@@ -161,3 +161,4 @@ velocity_norms.npy
 t1.txt
 *.zip
 emcoords.csv
+rename_files.py

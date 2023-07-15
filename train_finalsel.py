@@ -49,7 +49,7 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 					optimiser.zero_grad()
 					loss.backward()
 					optimiser.step()
-				this_metric.add_batch(poses_true, poses_pred)
+				this_metric.add_batch(poses_true, sel_pred)
 			print("Epoch {} {} done. Metrics: {}".format(i, phase, this_metric), flush = True)
 			if phase == "val" and this_metric.loss() < min_loss:
 				min_loss, min_epoch, best_state_dict = this_metric.loss(), i, deepcopy(model_sel.state_dict())
