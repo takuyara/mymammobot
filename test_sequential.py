@@ -25,6 +25,10 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 	hisenc_metric = Metrics(pose_inv_trans)
 	fusepred_metric = Metrics(pose_inv_trans)
 	finalsel_metric = Metrics(pose_inv_trans)
+	atloc_poses = []
+	hisenc_poses = []
+	fusepred_poses = []
+	finalsel_poses = []
 	for b_id, (imgs, poses_true, his_indices, pred_id, use_hisenc) in enumerate(dataloader):
 		with torch.no_grad():
 			if val_models < 1:
@@ -32,11 +36,6 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 			imgs, poses_true = imgs.to(device).float(), poses_true.to(device).float()
 			his_indices, pred_id, use_hisenc = his_indices.to(device).int(), int(pred_id.item()), int(use_hisenc.item())
 			#print(imgs.shape, poses_true.shape, his_indices.shape, pred_id, use_hisenc)
-			if pred_id == 0:
-				atloc_poses = []
-				hisenc_poses = []
-				fusepred_poses = []
-				finalsel_poses = []
 			#b, s, c, w, h 
 			bs, sqlen, C, W, H = tuple(imgs.shape)
 			imgs = imgs.reshape(bs * sqlen, C, W, H)
