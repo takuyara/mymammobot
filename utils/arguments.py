@@ -14,7 +14,9 @@ def get_base_parser(parser):
 	parser.add_argument("-d", "--device", type = str, default = "cuda", help = "The GPU device name.")
 	parser.add_argument("--save-path", type = str, default = "./checkpoints", help = "The base directory to save weights file.")
 	parser.add_argument("--data-stats", type = str, default = "./data_stats.json", help = "The pose metadata file. Should contain mean and std for rotation and quaternion.")
-	parser.add_argument("--no-normalise", action = "store_true", default = False, help = "Whether stop pose normalisation.")
+	parser.add_argument("--loss-fun", type = str, default = "l2", choices = ["l1", "l2"], help = "The loss function.")
+	parser.add_argument("--hispose-noise", type = float, default = 0, help = "The noise added to previous poses.")
+	parser.add_argument("--skip-prev-frame", action = "store_true", default = False, help = "Whether the history starts at i-1 or i-K when encoding i.")
 	return parser
 
 def get_r3d_parser(parser):
@@ -33,6 +35,8 @@ def get_hisenc_parser(parser):
 	parser.add_argument("--hidden-size", type = int, default = 512, help = "The hidden size of LSTM.")
 	parser.add_argument("--num-layers", type = int, default = 2, help = "The number of layers for LSTM.")
 	parser.add_argument("--mlp-hisenc-out", type = int, nargs = "+", default = [512, 256], help = "The number of neurons for each MLP layer (excluding the last prediction one).")
+	parser.add_argument("--bidirectional", action = "store_true", default = False, help = "Whether use bidirectional LSTM.")
+	parser.add_argument("--img-his-only", action = "store_true", default = False, help = "Whether only encode images in history encoder.")
 	return parser
 
 def get_fusepred_parser(parser):

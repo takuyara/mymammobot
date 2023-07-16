@@ -23,7 +23,7 @@ def quat_angular_error(q1, q2):
 	return dlt
 
 class Metrics:
-	def __init__(self, inv_trans, loss_fun = nn.MSELoss()):
+	def __init__(self, loss_fun, inv_trans):
 		self.inv_trans = inv_trans
 		self.n_samples = 0
 		self.sum_loss = 0
