@@ -46,6 +46,7 @@ def get_fusepred_parser(parser):
 def get_finalsel_parser(parser):
 	parser.add_argument("--fusepred-path", type = str, default = None, help = "The path to the trained fusepred path.")
 	parser.add_argument("--mlp-weighting", type = int, nargs = "+", default = [512, 1024], help = "The weighting layer size.")
+	parser.add_argument("--negative-weights", action = "store_true", default = False, help = "Whether allow negative weights (not using Softmax).")
 	return parser
 
 def get_test_parser(parser):

@@ -70,7 +70,7 @@ def main():
 	model_fuser.load_state_dict(torch.load(args.hisenc_path))
 	model_fuse_predictor = MLPFusePredictor(args.mlp_hisenc_out[-1], args.img_encode_dim, args.mlp_branch_his, args.mlp_branch_cur, args.mlp_fusepred_out, args.output_dim, args.dropout, args.fuse_mode).to(device)
 	model_fuse_predictor.load_state_dict(torch.load(args.fusepred_path))
-	model_sel = MLPSelector(args.img_encode_dim, args.mlp_weighting, args.dropout, 3, args.output_dim).to(device)
+	model_sel = MLPSelector(args.img_encode_dim, args.mlp_weighting, args.dropout, 3, args.output_dim, args.negative_weights).to(device)
 	optimiser = optim.Adam(model_sel.parameters(), lr = args.learning_rate)
 	min_loss, min_epoch, best_state_dict = train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloaders, optimiser, args.epochs, pose_inv_trans, device)
 	torch.save(best_state_dict, os.path.join(args.save_path, f"selector_{min_loss:.5f}.pth"))

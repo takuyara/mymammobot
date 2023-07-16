@@ -75,7 +75,7 @@ def main():
 	if args.fusepred_path is not None and val_models == 2:
 		model_fuse_predictor.load_state_dict(torch.load(args.fusepred_path))
 		val_models = 3
-	model_sel = MLPSelector(args.img_encode_dim, args.mlp_weighting, args.dropout, 3, args.output_dim).to(device)
+	model_sel = MLPSelector(args.img_encode_dim, args.mlp_weighting, args.dropout, 3, args.output_dim, args.negative_weights).to(device)
 	if args.finalsel_path is not None and val_models == 3:
 		model_sel.load_state_dict(torch.load(args.finalsel_path))
 		val_models = 4
