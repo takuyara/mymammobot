@@ -1,4 +1,6 @@
 import argparse
+hidden_arg_names = ["base_dir", "train_split", "val_split", "batch_size", "epochs", "output_dim", "img_size", "num_workers", "device", "save_path", "data_stats"]
+
 def get_base_parser(parser):
 	parser.add_argument("--base-dir", type = str, default = "./depth-images", help = "The base dataset dir.")
 	parser.add_argument("--train-split", type = str, default = "trains1.txt", help = "The path to train set split.")
@@ -74,4 +76,7 @@ def get_args(*reqs):
 			parser = get_finalsel_parser(parser)
 		elif req == "test":
 			parser = get_test_parser(parser)
-	return parser.parse_args()
+	args = parser.parse_args()
+	for arg_name, arg_value in vars(args):
+		if arg_name not in hidden_arg_names:
+			print(f"{arg_name}: {arg_value}")
