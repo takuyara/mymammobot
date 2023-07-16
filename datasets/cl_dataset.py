@@ -65,8 +65,9 @@ class TestDataset(Dataset):
 			for i in range(-1, len(this_path_indices) - 1):
 				indices = [i + 1] + [max(i - j * spacing, 0) for j in range(length)]
 				indices.reverse()
+				indices = [j + len(self.path_indices) for j in indices]
 				use_hisenc = 0 if i - length * spacing < 0 else 1
-				self.samples.append(([j + len(self.path_indices) for j in indices], i + 1, use_hisenc))
+				self.samples.append((indices, use_hisenc))
 			self.path_indices.extend(this_path_indices)
 		self.transform_img, self.transform_pos = transform_img, transform_pos
 
@@ -75,7 +76,7 @@ class TestDataset(Dataset):
 
 	def __getitem__(self, idx):
 		input_img, input_pos, his_indices = [], [], []
-		indices, pred_id, use_hisenc = self.samples[idx]
+		indices, use_hisenc = self.samples[idx]
 		for i in indices:
 			img, pos = load_single_file(*self.path_indices[i])
 			if self.transform_img is not None:
@@ -87,6 +88,4 @@ class TestDataset(Dataset):
 			input_pos.append(pos)
 			his_indices.append(i)
 		input_img = torch.stack(input_img)
-		input_pos = input_pos[-1]
-		his_indices = np.array(his_indices[ : -1])
-		return input_img, input_pos, his_indices, pred_id, use_hisenc
+		return input_img, input_pos[-1], np.array(indices[ : -1]), indices[-1], use_hisenc
