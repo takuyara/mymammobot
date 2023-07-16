@@ -80,3 +80,4 @@ def get_args(*reqs):
 	for arg_name, arg_value in vars(args).items():
 		if arg_name not in hidden_arg_names:
 			print(f"{arg_name}: {arg_value}")
+	return args
