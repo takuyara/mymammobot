@@ -4,18 +4,17 @@ import os
 from copy import deepcopy
 
 from utils.arguments import get_args
-from utils.pose_utils import Metrics
-from utils.nn_utils import get_loss_fun, get_loaders, get_models
+from utils.nn_utils import get_loaders_loss_metrics, get_models
 
-def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloader, loss_fun, pose_inv_trans, val_models, device):
+def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloader, metric_template, val_models, device):
 	model_atloc.eval()
 	model_fuser.eval()
 	model_fuse_predictor.eval()
 	model_sel.eval()
-	atloc_metric = Metrics(loss_fun, pose_inv_trans)
-	hisenc_metric = Metrics(loss_fun, pose_inv_trans)
-	fusepred_metric = Metrics(loss_fun, pose_inv_trans)
-	finalsel_metric = Metrics(loss_fun, pose_inv_trans)
+	atloc_metric = metric_template.new_copy()
+	hisenc_metric = metric_template.new_copy()
+	fusepred_metric = metric_template.new_copy()
+	finalsel_metric = metric_template.new_copy()
 	atloc_poses = []
 	hisenc_poses = []
 	fusepred_poses = []
@@ -82,7 +81,7 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 
 def main():
 	args = get_args("atloc", "hisenc", "fusepred", "finalsel", "test")
-	dataloader, pose_inv_trans = get_loaders(args, test = True, test_set = True)
+	dataloader, loss_fun, metric_template = get_loaders_loss_metrics(args, test = True, test_set = True)
 	model_atloc, model_fuser, model_fuse_predictor, model_sel, device = get_models(args, "atloc", "hisenc", "fusepred", "finalsel")
 	val_models = 0
 	if args.atloc_path is not None:
@@ -97,7 +96,7 @@ def main():
 	if args.finalsel_path is not None and val_models == 3:
 		model_sel.load_state_dict(torch.load(args.finalsel_path))
 		val_models = 4
-	val_results = train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloader, get_loss_fun(args), pose_inv_trans, val_models, device)
+	val_results = train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloader, metric_template, val_models, device)
 	for model_name, results in val_results:
 		print(model_name, results)
 

@@ -23,13 +23,27 @@ def quat_angular_error(q1, q2):
 	return dlt
 
 class Metrics:
-	def __init__(self, loss_fun, inv_trans):
+	def __init__(self, loss_fun, inv_trans, main_metric, rot_coef = None):
+		assert main_metric in ["loss", "trans_err", "rot_err", "comb_err"]
 		self.inv_trans = inv_trans
+		self.main_metric_name = main_metric
+		self.rot_coef = rot_coef
 		self.n_samples = 0
 		self.sum_loss = 0
 		self.loss_fun = loss_fun
 		self.sum_trans_error = 0
 		self.sum_rot_error = 0
+	def new_copy(self):
+		return Metrics(self.loss_fun, self.inv_trans, self.main_metric_name, self.rot_coef)
+	def main_metric(self):
+		if self.main_metric_name == "loss":
+			return self.loss()
+		elif self.main_metric_name == "trans_err":
+			return self.sum_trans_error / self.n_samples
+		elif self.main_metric_name == "rot_err":
+			return self.sum_rot_error / self.n_samples
+		elif self.main_metric_name == "comb_err":
+			return (self.sum_trans_error + self.rot_coef * self.sum_rot_error) / self.n_samples
 	def add_batch(self, inp, tgt):
 		self.n_samples += inp.size(0)
 		self.sum_loss += self.loss_fun(inp, tgt)

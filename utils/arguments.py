@@ -19,6 +19,8 @@ def get_base_parser(parser):
 	parser.add_argument("--loss-fun", type = str, default = "l2", choices = ["l1", "l2"], help = "The loss function.")
 	parser.add_argument("--hispose-noise", type = float, default = 0, help = "The noise added to previous poses.")
 	parser.add_argument("--skip-prev-frame", action = "store_true", default = False, help = "Whether the history starts at i-1 or i-K when encoding i.")
+	parser.add_argument("--model-sel-metric", type = str, choices = ["loss", "trans_err", "rot_err", "comb_err"], default = "comb_err", help = "The model selection metric.")
+	parser.add_argument("--model-sel-rot-coef", type = float, default = 0.5, help = "The coefficient applied to rotation error for combined error metric.")
 	return parser
 
 def get_r3d_parser(parser):
