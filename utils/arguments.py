@@ -77,6 +77,6 @@ def get_args(*reqs):
 		elif req == "test":
 			parser = get_test_parser(parser)
 	args = parser.parse_args()
-	for arg_name, arg_value in vars(args):
+	for arg_name, arg_value in vars(args).items():
 		if arg_name not in hidden_arg_names:
 			print(f"{arg_name}: {arg_value}")
