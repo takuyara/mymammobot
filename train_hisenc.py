@@ -16,7 +16,7 @@ def train_val(model_atloc, model_fuser, dataloaders, optimiser, epochs, loss_fun
 				model_fuser.eval()
 			this_metric = metric_template.new_copy()
 			for b_id, (imgs, poses) in enumerate(dataloaders[phase]):
-				with torch.set_grad_enabled(phase == "train"):
+				with torch.no_grad():
 					imgs, poses = imgs.to(device).float(), poses.to(device).float()
 					#imgs_input, poses_input = imgs[ : , ]
 					#b, s, c, w, h to b, c, s, w, h
@@ -26,6 +26,7 @@ def train_val(model_atloc, model_fuser, dataloaders, optimiser, epochs, loss_fun
 					imgs_history = imgs_history.reshape(bs * sqlen, C, W, H)
 					imgs_history = model_atloc(imgs_history, get_encode = True).detach()
 					imgs_history = imgs_history.reshape(bs, sqlen, imgs_history.size(1))
+				with torch.set_grad_enabled(phase == "train"):
 					poses_pred = model_fuser(imgs_history, poses_history)
 					loss = loss_fun(poses_true, poses_pred)
 				if phase == "train":

@@ -18,7 +18,7 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 				model_sel.eval()
 			this_metric = metric_template.new_copy()
 			for b_id, (imgs, poses) in enumerate(dataloaders[phase]):
-				with torch.set_grad_enabled(phase == "train"):
+				with torch.no_grad():
 					imgs, poses = imgs.to(device).float(), poses.to(device).float()
 					#imgs_input, poses_input = imgs[ : , ]
 					#b, s, c, w, h to b, c, s, w, h
@@ -31,7 +31,8 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 					history_encode, current_encode = imgs_encode[ : , : -1, : ], imgs_encode[ : , -1, : ]
 					history_encode, fuser_pred = model_fuser(history_encode, poses_history, get_encode = True, return_both = True)
 					fusepred_pred = model_fuse_predictor(history_encode, current_encode)
-					current_encode, atloc_pred, fuser_pred, fusepred_pred = current_encode.detach(), atloc_pred.detach(), fuser_pred.detach(), fusepred_pred.detach()
+					#current_encode, atloc_pred, fuser_pred, fusepred_pred = current_encode.detach(), atloc_pred.detach(), fuser_pred.detach(), fusepred_pred.detach()
+				with torch.set_grad_enabled(phase == "train"):	
 					sel_pred = model_sel(current_encode, atloc_pred, fuser_pred, fusepred_pred)
 					loss = loss_fun(poses_true, sel_pred)
 				if phase == "train":
