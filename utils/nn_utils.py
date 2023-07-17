@@ -15,9 +15,9 @@ from models.selector import MLPSelector
 
 def get_loss_fun(args):
 	if args.loss_fun == "l1":
-		return = nn.L1Loss()
+		return nn.L1Loss()
 	elif args.loss_fun == "l2":
-		return = nn.MSELoss()
+		return nn.MSELoss()
 	else:
 		raise NotImplementedError
 
