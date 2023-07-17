@@ -1,3 +1,4 @@
+import os
 import torch
 from torch import nn
 from torchvision import models
@@ -41,21 +42,21 @@ def get_models(args, *names):
 		if t_name.startswith("atloc"):
 			model = AtLoc(models.resnet34(pretrained = True), droprate = args.dropout, feat_dim = args.img_encode_dim).to(device)
 			if t_name.endswith("+"):
-				model.load_state_dict(torch.load(args.atloc_path))
+				model.load_state_dict(torch.load(os.path.join(args.save_path, args.atloc_path)))
 		elif t_name.startswith("hisenc"):
 			model = LSTMFuser(args.length, args.img_encode_dim, args.output_dim, args.hidden_size, args.num_layers,
 				args.mlp_hisenc_out, args.output_dim, args.dropout, args.bidirectional, args.img_his_only).to(device)
 			if t_name.endswith("+"):
-				model.load_state_dict(torch.load(args.hisenc_path))
+				model.load_state_dict(torch.load(os.path.join(args.save_path, args.hisenc_path)))
 		elif t_name.startswith("fusepred"):
 			model = MLPFusePredictor(args.mlp_hisenc_out[-1], args.img_encode_dim, args.mlp_branch_his,
 				args.mlp_branch_cur, args.mlp_fusepred_out, args.output_dim, args.dropout, args.fuse_mode).to(device)
 			if t_name.endswith("+"):
-				model.load_state_dict(torch.load(args.fusepred_path))
+				model.load_state_dict(torch.load(os.path.join(args.save_path, args.fusepred_path)))
 		elif t_name.startswith("finalsel"):
 			model = MLPSelector(args.img_encode_dim, args.mlp_weighting, args.dropout, 3, args.output_dim, args.negative_weights).to(device)
 			if t_name.endswith("+"):
-				model.load_state_dict(torch.load(args.finalsel_path))
+				model.load_state_dict(torch.load(os.path.join(args.save_path, args.finalsel_path)))
 		else:
 			raise NotImplementedError
 		res_models.append(model)
