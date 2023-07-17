@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import TensorDataset, DataLoader
 
 def get_processed_dataloaders(dataloaders, device, *models):
-	def get_a_loader(this_loader):
+	def get_a_loader(this_loader, shuffle):
 		if len(models) == 0:
 			return this_loader
 		n_model_to_n_res = {1 : 3, 2 : 3, 3 : 5}
@@ -38,11 +38,11 @@ def get_processed_dataloaders(dataloaders, device, *models):
 				raise NotImplementedError
 		all_res = [torch.cat(this_res, dim = 0) for this_res in all_res]
 		dataset = TensorDataset(*all_res)
-		dataloader = DataLoader(dataset, num_workers = this_loader.num_workers, shuffle = this_loader.shuffle, batch_size = this_loader.batch_size)
+		dataloader = DataLoader(dataset, num_workers = this_loader.num_workers, shuffle = shuffle, batch_size = this_loader.batch_size)
 
 	for t_model in models:
 		t_model.eval()
 	if type(dataloaders) == dict:
-		return {phase : get_a_loader(this_loader) for phase, this_loader in dataloaders.items()}
+		return {phase : get_a_loader(this_loader, phase == "train") for phase, this_loader in dataloaders.items()}
 	else:
-		return get_a_loader(dataloader)
+		return get_a_loader(dataloader, False)
