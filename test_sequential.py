@@ -85,16 +85,16 @@ def main():
 	model_atloc, model_fuser, model_fuse_predictor, model_sel, device = get_models(args, "atloc", "hisenc", "fusepred", "finalsel")
 	val_models = 0
 	if args.atloc_path is not None:
-		model_atloc.load_state_dict(torch.load(args.atloc_path))
+		model_atloc.load_state_dict(torch.load(os.path.join(args.save_path, args.atloc_path)))
 		val_models = 1
 	if args.hisenc_path is not None and val_models == 1:
-		model_fuser.load_state_dict(torch.load(args.hisenc_path))
+		model_fuser.load_state_dict(torch.load(os.path.join(args.save_path, args.hisenc_path)))
 		val_models = 2
 	if args.fusepred_path is not None and val_models == 2:
-		model_fuse_predictor.load_state_dict(torch.load(args.fusepred_path))
+		model_fuse_predictor.load_state_dict(torch.load(os.path.join(args.save_path, args.fusepred_path)))
 		val_models = 3
 	if args.finalsel_path is not None and val_models == 3:
-		model_sel.load_state_dict(torch.load(args.finalsel_path))
+		model_sel.load_state_dict(torch.load(os.path.join(args.save_path, args.finalsel_path)))
 		val_models = 4
 	val_results = train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloader, metric_template, val_models, device)
 	for model_name, results in val_results:
