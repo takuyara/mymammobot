@@ -39,6 +39,7 @@ def get_processed_dataloaders(dataloaders, device, *models):
 		all_res = [torch.cat(this_res, dim = 0) for this_res in all_res]
 		dataset = TensorDataset(*all_res)
 		dataloader = DataLoader(dataset, num_workers = this_loader.num_workers, shuffle = shuffle, batch_size = this_loader.batch_size)
+		return dataloader
 
 	for t_model in models:
 		t_model.eval()
