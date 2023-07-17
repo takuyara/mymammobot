@@ -55,6 +55,6 @@ class Metrics:
 	def loss(self):
 		return self.sum_loss / self.n_samples
 	def get_dict(self):
-		return {"loss": self.sum_loss / self.n_samples, "translation_error": self.sum_trans_error / self.n_samples, "rotation_error": self.sum_rot_error / self.n_samples}
+		return {"loss": self.sum_loss / self.n_samples, "translation_error": self.sum_trans_error / self.n_samples, "rotation_error": self.sum_rot_error / self.n_samples, "main_metric": self.main_metric()}
 	def __repr__(self):
 		return ",".join([f"{m_name}: {m_value:.5f}" for m_name, m_value in self.get_dict().items()])
