@@ -5,9 +5,9 @@ from copy import deepcopy
 
 from utils.arguments import get_args
 from utils.nn_utils import get_loaders_loss_metrics, get_models
+from utils.forward_passes import get_processed_dataloaders
 
-def train_val(model_atloc, model_fuser, dataloaders, optimiser, epochs, loss_fun, metric_template, device):
-	model_atloc.eval()
+def train_val(model_fuser, dataloaders, optimiser, epochs, loss_fun, metric_template, device):
 	for i in range(epochs):
 		for phase in ["train", "val"]:
 			if phase == "train":
@@ -15,19 +15,9 @@ def train_val(model_atloc, model_fuser, dataloaders, optimiser, epochs, loss_fun
 			else:
 				model_fuser.eval()
 			this_metric = metric_template.new_copy()
-			for b_id, (imgs, poses) in enumerate(dataloaders[phase]):
-				with torch.no_grad():
-					imgs, poses = imgs.to(device).float(), poses.to(device).float()
-					#imgs_input, poses_input = imgs[ : , ]
-					#b, s, c, w, h to b, c, s, w, h
-					imgs_history, poses_history = imgs[ : , : -1, ...], poses[ : , : -1, ...]
-					poses_true = poses[ : , -1, ...]
-					bs, sqlen, C, W, H = tuple(imgs_history.shape)
-					imgs_history = imgs_history.reshape(bs * sqlen, C, W, H)
-					imgs_history = model_atloc(imgs_history, get_encode = True).detach()
-					imgs_history = imgs_history.reshape(bs, sqlen, imgs_history.size(1))
+			for b_id, (history_encode, poses_history, poses_true) in enumerate(dataloaders[phase]):
 				with torch.set_grad_enabled(phase == "train"):
-					poses_pred = model_fuser(imgs_history, poses_history)
+					poses_pred = model_fuser(history_encode, poses_history)
 					loss = loss_fun(poses_true, poses_pred)
 				if phase == "train":
 					optimiser.zero_grad()
@@ -45,7 +35,8 @@ def main():
 	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args)
 	model_atloc, model_fuser, device = get_models(args, "atloc+", "hisenc")
 	optimiser = optim.Adam(model_fuser.parameters(), lr = args.learning_rate)
-	min_loss, min_epoch, best_state_dict = train_val(model_atloc, model_fuser, dataloaders, optimiser, args.epochs, loss_fun, metric_template, device)
+	dataloaders = get_processed_dataloaders(dataloaders, device, model_atloc)
+	min_loss, min_epoch, best_state_dict = train_val(model_fuser, dataloaders, optimiser, args.epochs, loss_fun, metric_template, device)
 	torch.save(best_state_dict, os.path.join(args.save_path, f"hisenc_fuser_{min_loss:.5f}.pth"))
 
 if __name__ == '__main__':
