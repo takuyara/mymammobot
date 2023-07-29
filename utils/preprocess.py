@@ -10,7 +10,7 @@ def get_img_transform(data_stats_path, img_size, modality):
 	img_mean, img_std = [stats["img_mean"]] * 3, [stats["img_std"]] * 3
 	trans_list = [transforms.Resize(img_size), transforms.CenterCrop(img_size), transforms.ToTensor()]
 	if modality == "SFS":
-		W, B = stats["sfs_intensity_w"] / 255, stats["sfs_intensity_b"] / 255
+		W, B = stats["sfs_intensity_w"], stats["sfs_intensity_b"] / 255
 		def trans_intensity(x):
 			return torch.maximum(torch.minimum(x * W + B, torch.tensor(1.0)), torch.tensor(0.0))
 		trans_list.append(transforms.Lambda(trans_intensity))
