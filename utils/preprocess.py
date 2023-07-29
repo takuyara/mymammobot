@@ -28,7 +28,7 @@ def get_pose_transforms(data_stats_path, hispose_noise, modality):
 		if not true_pose:
 			x = x + np.random.randn(*x.shape) * hispose_noise
 		return x
-	if modality == "SF":
+	if modality == "SFS":
 		ct_origin, em_origin = np.array(stats["ct_origin"]), np.array(stats["em_origin"])
 		def trans_em(x):
 			return compute_rotation_quaternion(ct_origin, R.from_quat(x).apply(em_origin))
