@@ -61,6 +61,7 @@ def get_test_parser(parser):
 	parser.add_argument("--finalsel-path", type = str, default = None, help = "The path to the final selection path.")
 	parser.add_argument("--test-split", type = str, default = "tests1.txt", help = "The path to test set (real images) split.")
 	parser.add_argument("--test-modality", type = str, default = "SFS", choices = ["SFS", "mesh"], help = "The test modality.")
+	parser.add_argument("--save-predictions", action = "store_true", default = False, help = "Whether save the predicted trajectory (as well as the ground truth) for plot.")
 	return parser
 
 def get_args(*reqs):

@@ -19,6 +19,7 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 	hisenc_poses = []
 	fusepred_poses = []
 	finalsel_poses = []
+	true_poses = []
 	for b_id, (imgs, poses_true, his_indices, pred_id, use_hisenc) in enumerate(dataloader):
 		with torch.no_grad():
 			if val_models < 1:
@@ -36,6 +37,7 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 			atloc_metric.add_batch(atloc_pred, poses_true)
 			assert len(atloc_poses) == pred_id
 			atloc_poses.append(atloc_pred)
+			true_poses.append(poses_true)
 			if val_models < 2:
 				continue
 
@@ -77,7 +79,8 @@ def train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloa
 			finalsel_poses.append(sel_pred)
 
 	all_val = [("AtLoc", atloc_metric),("HisEnc", hisenc_metric), ("FusePred", fusepred_metric), ("FinalSel", finalsel_metric)]
-	return all_val[ : val_models]
+	all_poses = [("GroundTruth", true_poses), ("AtLoc", atloc_poses), ("HisEnc", hisenc_poses), ("FusePred", fusepred_poses), ("FinalSel", finalsel_poses)]
+	return all_val[ : val_models], all_poses[ : val_models + 1]
 
 def main():
 	args = get_args("atloc", "hisenc", "fusepred", "finalsel", "test")
@@ -96,9 +99,13 @@ def main():
 	if args.finalsel_path is not None and val_models == 3:
 		model_sel.load_state_dict(torch.load(os.path.join(args.save_path, args.finalsel_path)))
 		val_models = 4
-	val_results = train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloader, metric_template, val_models, device)
+	val_results, val_preds = train_val(model_atloc, model_fuser, model_fuse_predictor, model_sel, dataloader, metric_template, val_models, device)
 	for model_name, results in val_results:
 		print(model_name, results)
+	if args.save_predictions:
+		for model_name, predictions in val_preds:
+			predictions = torch.cat(predictions, dim = 0).cpu().numpy()
+			np.save(os.path.join(args.save_path, f"{model_name}.npy"), predictions)
 
 if __name__ == '__main__':
 	main()
