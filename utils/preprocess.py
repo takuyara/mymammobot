@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from torchvision import transforms
 from scipy.spatial.transform import Rotation as R
-from utils.pose_utils import compute_rotation_quaternion
+from utils.pose_utils import compute_rotation_quaternion, get_3dof_quat, revert_quat
 
 def get_img_transform(data_stats_path, img_size, modality):
 	stats = json.load(open(data_stats_path))
@@ -32,7 +32,9 @@ def get_pose_transforms(data_stats_path, hispose_noise, modality):
 	if modality == "SFS":
 		ct_origin, em_origin = np.array(stats["ct_origin"]), np.array(stats["em_origin"])
 		def trans_em(x):
-			return compute_rotation_quaternion(ct_origin, R.from_quat(x).apply(em_origin))
+			trans, quat = x[ : 3], revert_quat(x[3 : ])
+			quat = compute_rotation_quaternion(ct_origin, R.from_quat(quat).apply(em_origin))
+			return np.concatenate([trans, get_3dof_quat(quat)])
 		trans = lambda x, tp : trans_norm(trans_em(x), tp)
 	elif modality == "mesh":
 		trans = trans_norm

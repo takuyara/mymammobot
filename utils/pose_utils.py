@@ -2,20 +2,23 @@ import numpy as np
 from torch import nn
 from scipy.spatial.transform import Rotation as R
 
-def get_6dof_pose_label(pose):
-	pose = pose.reshape(-1)
-	trans, quat = pose[ : 3], pose[3 : ]
+def get_3dof_quat(quat):
 	quat *= np.sign(quat[0])
 	if np.linalg.norm(quat[1 : ]) != 0:
 		quat_3dof = np.arccos(quat[0]) * quat[1 : ] / np.linalg.norm(quat[1 : ])
 	else:
 		quat_3dof = np.zeros(3)
-	return np.concatenate([trans, quat_3dof])
+	return quat_3dof
 
 def revert_quat(quat_3dof):
 	norm = np.linalg.norm(quat_3dof)
 	quat = np.concatenate([[np.cos(norm)], np.sinc(norm / np.pi) * quat_3dof])
 	return quat
+
+def get_6dof_pose_label(pose):
+	pose = pose.reshape(-1)
+	trans, quat = pose[ : 3], pose[3 : ]
+	return np.concatenate([trans, get_3dof_quat(quat)])
 
 def quat_angular_error(q1, q2):
 	d = np.abs(np.dot(q1, q2))
