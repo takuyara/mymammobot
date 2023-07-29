@@ -8,20 +8,11 @@ from tqdm import tqdm
 import cv2
 from scipy.signal import savgol_filter
 import sys
+from utils.pose_utils import compute_rotation_quaternion
 
 import warnings
 warnings.filterwarnings("ignore", category = UserWarning)
 
-def compute_rotation_quaternion(src, tgt):
-	src, tgt = src / np.linalg.norm(src), tgt / np.linalg.norm(tgt)
-	crs = np.cross(src, tgt)
-	if np.linalg.norm(crs) > 0:
-		dot = np.dot(src, tgt)
-		K = np.array([[0, -crs[2], crs[1]], [crs[2], 0, -crs[0]], [-crs[1], crs[0], 0]])
-		K = np.eye(3) + K + K.dot(K) * ((1 - dot) / (np.linalg.norm(crs) ** 2))
-	else:
-		K = np.eye(3)
-	return R.from_matrix(K).as_quat()
 
 """
 def rotation_matrix_from_vectors(vec1, vec2):
@@ -42,6 +33,7 @@ clip_value = 120
 window_size = 41
 polyorder = 3
 focal_length = 214
+view_angle = 120
 cl_idx = int(sys.argv[1])
 cur_fold = int(sys.argv[2])
 move_rate = 0.3
@@ -114,6 +106,7 @@ for i in range(len(positions)):
 	#print(orientations[i], quaternion)
 	camera.position = positions[i]
 	camera.focal_point = focal_length * orientations[i] + camera.position
+	camera.view_angle = view_angle
 	p.camera = camera
 	p.show(auto_close = False)
 	img = -p.get_image_depth()

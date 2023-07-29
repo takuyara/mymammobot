@@ -1,5 +1,6 @@
 import numpy as np
 from torch import nn
+from scipy.spatial.transform import Rotation as R
 
 def get_6dof_pose_label(pose):
 	pose = pose.reshape(-1)
@@ -21,6 +22,17 @@ def quat_angular_error(q1, q2):
 	d = min(1, max(-1, d))
 	dlt = 2 * np.arccos(d) * 180 / np.pi
 	return dlt
+
+def compute_rotation_quaternion(src, tgt):
+	src, tgt = src / np.linalg.norm(src), tgt / np.linalg.norm(tgt)
+	crs = np.cross(src, tgt)
+	if np.linalg.norm(crs) > 0:
+		dot = np.dot(src, tgt)
+		K = np.array([[0, -crs[2], crs[1]], [crs[2], 0, -crs[0]], [-crs[1], crs[0], 0]])
+		K = np.eye(3) + K + K.dot(K) * ((1 - dot) / (np.linalg.norm(crs) ** 2))
+	else:
+		K = np.eye(3)
+	return R.from_matrix(K).as_quat()
 
 class Metrics:
 	def __init__(self, loss_fun, inv_trans, main_metric, rot_coef = None):

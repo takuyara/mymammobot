@@ -23,11 +23,12 @@ def get_loss_fun(args):
 		raise NotImplementedError
 
 def get_loaders_loss_metrics(args, test = False, test_set = False):
-	pose_trans, pose_inv_trans = get_pose_transforms(args.data_stats, args.hispose_noise)
+	input_modality = args.test_modality if test else "mesh"
+	pose_trans, pose_inv_trans = get_pose_transforms(args.data_stats, args.hispose_noise, input_modality)
 	phase_split_path = [("test", args.test_split)] if test else [("train", args.train_split), ("val", args.val_split)]
 	batch_size, ds_type = (1, TestDataset) if test and test_set else (args.batch_size, CLDataset)
 	datasets = {phase : ds_type(args.base_dir, get_dir_list(split_path), args.length, args.spacing, args.skip_prev_frame,
-		get_img_transform(args.data_stats, args.img_size), pose_trans) for phase, split_path in phase_split_path}
+		get_img_transform(args.data_stats, args.img_size, input_modality), pose_trans) for phase, split_path in phase_split_path}
 	dataloaders = {phase : DataLoader(ds, batch_size = batch_size,
 		num_workers = args.num_workers, shuffle = phase == "train") for phase, ds in datasets.items()}
 	if test:
