@@ -106,6 +106,7 @@ def main():
 	if args.save_predictions:
 		for model_name, predictions in val_preds:
 			predictions = torch.cat(predictions, dim = 0).cpu().numpy()
+			predictions = metric_template.inv_trans(predictions)
 			np.save(os.path.join(args.save_path, f"{model_name}.npy"), predictions)
 
 if __name__ == '__main__':
