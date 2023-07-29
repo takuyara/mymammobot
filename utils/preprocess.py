@@ -33,7 +33,7 @@ def get_pose_transforms(data_stats_path, hispose_noise, modality):
 		ct_origin, em_origin = np.array(stats["ct_origin"]), np.array(stats["em_origin"])
 		def trans_em(x):
 			return compute_rotation_quaternion(ct_origin, R.from_quat(x).apply(em_origin))
-		trans = lambda x : trans_norm(trans_em(x))
+		trans = lambda x, tp : trans_norm(trans_em(x), tp)
 	elif modality == "mesh":
 		trans = trans_norm
 	else:
