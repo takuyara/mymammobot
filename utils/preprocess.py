@@ -12,7 +12,7 @@ def get_img_transform(data_stats_path, img_size, modality):
 	if modality == "SFS":
 		W, B = stats["sfs_intensity_w"] / 255, stats["sfs_intensity_b"] / 255
 		def trans_intensity(x):
-			x = torch.maximum(torch.minimum(x * W + B, torch.tensor(1.0)), torch.tensor(0.0))
+			return torch.maximum(torch.minimum(x * W + B, torch.tensor(1.0)), torch.tensor(0.0))
 		trans_list.append(transforms.Lambda(trans_intensity))
 	elif modality == "mesh":
 		pass
