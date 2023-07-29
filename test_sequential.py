@@ -2,6 +2,7 @@ import torch
 from torch import optim
 import os
 from copy import deepcopy
+import numpy as np
 
 from utils.arguments import get_args
 from utils.nn_utils import get_loaders_loss_metrics, get_models
