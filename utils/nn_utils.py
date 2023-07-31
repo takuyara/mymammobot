@@ -14,11 +14,16 @@ from models.fuser import LSTMFuser
 from models.fuse_predictor import MLPFusePredictor
 from models.selector import MLPSelector
 
+def l2_trans_loss(inp, tgt):
+	return nn.MSELoss()(inp[..., : 3], tgt[..., : 3])
+
 def get_loss_fun(args):
 	if args.loss_fun == "l1":
 		return nn.L1Loss()
 	elif args.loss_fun == "l2":
 		return nn.MSELoss()
+	elif args.loss_fun == "l2_trans":
+		return l2_trans_loss
 	else:
 		raise NotImplementedError
 

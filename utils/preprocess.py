@@ -8,7 +8,8 @@ from utils.pose_utils import compute_rotation_quaternion, get_3dof_quat, revert_
 def get_img_transform(data_stats_path, img_size, modality):
 	stats = json.load(open(data_stats_path))
 	img_mean, img_std = [stats["img_mean"]] * 3, [stats["img_std"]] * 3
-	trans_list = [transforms.Resize(img_size), transforms.CenterCrop(img_size), transforms.ToTensor()]
+	trans_list = [transforms.Resize(img_size), transforms.CenterCrop(img_size), transforms.RandomRotation(5), transforms.RandomHorizontalFlip(0.5),
+		transforms.RandomVerticalFlip(0.5), transforms.GaussianBlur(5), transforms.ToTensor()]
 	if modality == "SFS":
 		W, B = stats["sfs_intensity_w"], stats["sfs_intensity_b"] / 255
 		def trans_intensity(x):

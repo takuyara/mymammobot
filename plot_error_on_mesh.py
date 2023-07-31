@@ -30,9 +30,9 @@ def main():
 	p = pv.Plotter()
 	p.add_mesh(airway, opacity = 0.5)
 	gt_traj, pred_traj = np.load(gt_path), np.load(pred_path)
-	print(gt_traj.shape, pred_traj.shape)
+	gt_traj = gt_traj[ : 200]
+	pred_traj = pred_traj[ : 200]
 	for i in range(len(gt_traj)):
-		print(gt_traj[i, : 3])
 		ln = pv.Line(gt_traj[i, : 3], pred_traj[i, : 3])
 		p.add_mesh(ln, color = "red", line_width = 3)
 	p.show()
