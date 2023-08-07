@@ -20,6 +20,7 @@ def get_args():
 	parser.add_argument("--em-base-path", type = str, default = "./depth-images")
 	parser.add_argument("--cl-base-path", type = str, default = "./CL")
 	parser.add_argument("--output-metadata", type = str, default = "register_params.csv")
+	parser.add_argument("--try-idx", type = int, default = 0)
 	parser.add_argument("--pool-size", type = int, default = 10)
 	parser.add_argument("--em-idx", type = int, default = 0)
 	parser.add_argument("--step-size", type = int, default = 8)
@@ -119,7 +120,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 def main():
 	pv.start_xvfb()
 	args = get_args()
-	output_path = os.path.join(args.em_base_path, f"EM-virtual-autofix-{args.em_idx}")
+	output_path = os.path.join(args.em_base_path, f"EM-virtual-autofix-{args.em_idx}-{args.try_idx}")
 	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
 	em_depth_path = os.path.join(args.em_base_path, f"EM-rawdep-{args.em_idx}")
 	os.makedirs(output_path, exist_ok = True)
