@@ -57,7 +57,7 @@ def project_to_cl(x, all_cls, n_candidates = 50, return_cl_idx = False):
 		return proj
 
 def in_mesh_bounds(x, all_cls, n_candidates = 50):
-	proj, (cl_idx, on_line_idx) = project_to_cl(x, al, n_candidates, return_cl_idx = True)
+	proj, (cl_idx, on_line_idx) = project_to_cl(x, all_cls, n_candidates, return_cl_idx = True)
 	points, radiuses = all_cls[cl_idx]
 	l_dist = np.linalg.norm(proj - points[on_line_idx, ...])
 	r_dist = np.linalg.norm(proj - points[on_line_idx + 1, ...])
