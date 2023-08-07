@@ -20,7 +20,7 @@ def get_args():
 	parser.add_argument("--em-base-path", type = str, default = "./depth-images")
 	parser.add_argument("--cl-base-path", type = str, default = "./CL")
 	parser.add_argument("--output-metadata", type = str, default = "register_params.csv")
-	parser.add_argument("--ignore-oob", action = "store_true", default = False)
+	parser.add_argument("--filter-oob", action = "store_true", default = False)
 	parser.add_argument("--try-idx", type = int, default = 0)
 	parser.add_argument("--pool-size", type = int, default = 10)
 	parser.add_argument("--em-idx", type = int, default = 0)
@@ -103,7 +103,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 	for i, (t_focal, t_position, t_orientation, t_up) in enumerate(all_sampled_params):
 		#p1.add_mesh(pv.Arrow(t_position, t_orientation), color = "red")
 		#p1.add_mesh(pv.Arrow(t_position, t_up), color = "green")
-		if not args.ignore_oob and not in_mesh_bounds(t_position, all_cls, cl_indices):
+		if args.filter_oob and not in_mesh_bounds(t_position, all_cls, cl_indices):
 			n_oob += 1
 			continue
 		this_corr_params = get_fixed_corr(real_depth_map, p, t_focal, t_position, t_orientation, t_up)
@@ -111,7 +111,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 			best_corr_params = this_corr_params
 			better_params_found = True
 	
-	print("{:.2f} trys per second.".format(len(all_sampled_params) / (time.time() - st_time), n_oob / len(all_sampled_params)))
+	print("{:.2f} trys per second.".format(len(all_sampled_params) / (time.time() - st_time)))
 	# 185 trys per second
 	#p1.show()
 
