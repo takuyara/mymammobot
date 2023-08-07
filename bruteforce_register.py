@@ -121,7 +121,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 	print(f"Frame {frame_idx} done.", flush = True)
 
 def main():
-	pv.start_xvfb()
+	#pv.start_xvfb()
 	args = get_args()
 	output_path = os.path.join(args.em_base_path, f"EM-virtual-autofix-{args.em_idx}-{args.try_idx}")
 	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
