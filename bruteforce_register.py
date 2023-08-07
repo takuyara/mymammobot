@@ -102,7 +102,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 
 	for i, (t_focal, t_position, t_orientation, t_up) in enumerate(all_sampled_params):
 		if i % 10 == 0:
-			print(i, all_sampled_params)
+			print(i, all_sampled_params, flush = True)
 		#p1.add_mesh(pv.Arrow(t_position, t_orientation), color = "red")
 		#p1.add_mesh(pv.Arrow(t_position, t_up), color = "green")
 		if not args.ignore_oob:
