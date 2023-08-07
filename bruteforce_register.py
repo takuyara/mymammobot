@@ -96,6 +96,8 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 	#p1 = pv.Plotter()
 	#p1.add_mesh(surface, opacity = 0.5)
 
+	st_time = time.time()
+
 	for t_focal, t_position, t_orientation, t_up in all_sampled_params:
 		#p1.add_mesh(pv.Arrow(t_position, t_orientation), color = "red")
 		#p1.add_mesh(pv.Arrow(t_position, t_up), color = "green")
@@ -104,6 +106,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 			best_corr_params = this_corr_params
 			better_params_found = True
 	
+	print("{:.2f} trys per second".format(len(all_sampled_params) / (time.time() - st_time)))
 	# 185 trys per second
 	#p1.show()
 
