@@ -83,7 +83,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 	raw_position = np.loadtxt(os.path.join(em_path, f"{frame_idx:06d}.txt")).reshape(-1)
 	real_depth_map = np.load(os.path.join(em_depth_path, f"{frame_idx:06d}.npy"))
 	translation, quaternion = raw_position[ : 3], raw_position[3 : ]
-	translation = project_to_cl(translation, all_cls)
+	translation, cl_indices = project_to_cl(translation, all_cls, return_cl_indices = True)
 	orientation = R.from_quat(quaternion).apply(camera_params["forward_direction"])
 	orientation = orientation / np.linalg.norm(orientation)
 	up_direction = R.from_quat(quaternion).apply(camera_params["up_direction"])
@@ -101,20 +101,17 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 	n_oob = 0
 
 	for i, (t_focal, t_position, t_orientation, t_up) in enumerate(all_sampled_params):
-		if i % 10 == 0:
-			print(i, all_sampled_params, flush = True)
 		#p1.add_mesh(pv.Arrow(t_position, t_orientation), color = "red")
 		#p1.add_mesh(pv.Arrow(t_position, t_up), color = "green")
-		if not args.ignore_oob:
-			if not in_mesh_bounds(t_position, all_cls):
-				n_oob += 1
-				continue
+		if not args.ignore_oob and not in_mesh_bounds(t_position, all_cls, cl_indices):
+			n_oob += 1
+			continue
 		this_corr_params = get_fixed_corr(real_depth_map, p, t_focal, t_position, t_orientation, t_up)
 		if this_corr_params[0] > best_corr_params[0]:
 			best_corr_params = this_corr_params
 			better_params_found = True
 	
-	print("{:.2f} trys per second. OOB rate: {:.4f}".format(len(all_sampled_params) / (time.time() - st_time), n_oob / len(all_sampled_params)))
+	print("{:.2f} trys per second.".format(len(all_sampled_params) / (time.time() - st_time), n_oob / len(all_sampled_params)))
 	# 185 trys per second
 	#p1.show()
 
@@ -140,6 +137,8 @@ def main():
 		pool.apply_async(fix_single_frame, args = (i, em_path, em_depth_path, output_path, args))
 	pool.close()
 	pool.join()
+
+	# fix_single_frame(0, em_path, em_depth_path, output_path, args)
 
 if __name__ == '__main__':
 	main()

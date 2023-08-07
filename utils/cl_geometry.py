@@ -26,11 +26,11 @@ def load_all_cls(base_path, n_cls = 100):
 		all_cls.append((points, radiuses))
 	return all_cls
 
-def project_point_to_line(x, a, b):
+def project_point_to_line(x, a, b, fix_oob = True):
 	if np.linalg.norm(a - b) == 0:
 		return a
 	x_ = np.dot(x - a, b - a) / np.dot(b - a, b - a) * (b - a) + a
-	if np.allclose(np.linalg.norm(x_ - a) + np.linalg.norm(x_ - b), np.linalg.norm(a - b)):
+	if not fix_oob or np.allclose(np.linalg.norm(x_ - a) + np.linalg.norm(x_ - b), np.linalg.norm(a - b)):
 		return x_
 	else:
 		return a if np.linalg.norm(x - a) < np.linalg.norm(x - b) else b
@@ -47,22 +47,33 @@ def locate_on_cl(x, all_cls, n_candidates = 50):
 				min_dist, cl_pos = np.linalg.norm(x_ - x), (cl_idx, i)
 	return cl_pos
 
-def project_to_cl(x, all_cls, n_candidates = 50, return_cl_idx = False):
+def project_to_cl(x, all_cls, n_candidates = 50, return_cl_indices = False):
 	cl_idx, on_line_idx = locate_on_cl(x, all_cls, n_candidates)
 	points, radiuses = all_cls[cl_idx]
 	proj = project_point_to_line(x, points[on_line_idx, ...], points[on_line_idx + 1, ...])
-	if return_cl_idx:
+	if return_cl_indices:
 		return proj, (cl_idx, on_line_idx)
 	else:
 		return proj
 
+"""
 def in_mesh_bounds(x, all_cls, n_candidates = 50):
-	proj, (cl_idx, on_line_idx) = project_to_cl(x, all_cls, n_candidates, return_cl_idx = True)
+	proj, (cl_idx, on_line_idx) = project_to_cl(x, all_cls, n_candidates, return_cl_indices = True)
 	points, radiuses = all_cls[cl_idx]
 	l_dist = np.linalg.norm(proj - points[on_line_idx, ...])
 	r_dist = np.linalg.norm(proj - points[on_line_idx + 1, ...])
 	radius = (radiuses[on_line_idx, ...] * l_dist + radiuses[on_line_idx + 1, ...] * r_dist) / (l_dist + r_dist)
 	return np.linalg.norm(x - proj) <= radius
+"""
+
+def in_mesh_bounds(x, all_cls, cl_indices, tolerance = 0.5, n_candidates = 50):
+	cl_idx, on_line_idx = cl_indices
+	points, radiuses = all_cls[cl_idx]
+	proj = project_point_to_line(x, points[on_line_idx, ...], points[on_line_idx + 1, ...], fix_oob = False)
+	l_dist = np.linalg.norm(proj - points[on_line_idx, ...])
+	r_dist = np.linalg.norm(proj - points[on_line_idx + 1, ...])
+	radius = (radiuses[on_line_idx, ...] * l_dist + radiuses[on_line_idx + 1, ...] * r_dist) / (l_dist + r_dist)
+	return np.linalg.norm(x - proj) <= radius + tolerance
 
 def random_points_in_sphere(num_points, radius = 1, in_sphere = True):
 	vec = np.random.randn(num_points, 3)
