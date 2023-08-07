@@ -34,7 +34,8 @@ def project_point_to_line(x, a, b):
 		return x_
 	else:
 		return a if np.linalg.norm(x - a) < np.linalg.norm(x - b) else b
-def project_to_cl(x, all_cls, n_candidates = 50):
+
+def locate_on_cl(x, all_cls, n_candidates = 50):
 	min_dist = 1e10
 	for cl_idx, (cl_points, __) in enumerate(all_cls):
 		cl_dists = np.sum((cl_points - x) ** 2, axis = 1)
@@ -43,8 +44,25 @@ def project_to_cl(x, all_cls, n_candidates = 50):
 				continue
 			x_ = project_point_to_line(x, cl_points[i, ...], cl_points[i + 1, ...])
 			if np.linalg.norm(x_ - x) < min_dist:
-				min_dist, best_proj = np.linalg.norm(x_ - x), x_
-	return best_proj
+				min_dist, cl_pos = np.linalg.norm(x_ - x), (cl_idx, i)
+	return cl_pos
+
+def project_to_cl(x, all_cls, n_candidates = 50, return_cl_idx = False):
+	cl_idx, on_line_idx = locate_on_cl(x, all_cls, n_candidates)
+	points, radiuses = all_cls[cl_idx]
+	proj = project_point_to_line(x, points[on_line_idx, ...], points[on_line_idx + 1, ...])
+	if return_cl_idx:
+		return proj, (cl_idx, on_line_idx)
+	else:
+		return proj
+
+def in_mesh_bounds(x, all_cls, n_candidates = 50):
+	proj, (cl_idx, on_line_idx) = project_to_cl(x, al, n_candidates, return_cl_idx = True)
+	points, radiuses = all_cls[cl_idx]
+	l_dist = np.linalg.norm(proj - points[on_line_idx, ...])
+	r_dist = np.linalg.norm(proj - points[on_line_idx + 1, ...])
+	radius = (radiuses[on_line_idx, ...] * l_dist + radiuses[on_line_idx + 1, ...] * r_dist) / (l_dist + r_dist)
+	return np.linalg.norm(x - proj) <= radius
 
 def random_points_in_sphere(num_points, radius = 1, in_sphere = True):
 	vec = np.random.randn(num_points, 3)

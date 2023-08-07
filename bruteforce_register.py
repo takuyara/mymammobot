@@ -11,7 +11,7 @@ import time
 from multiprocessing import Pool
 
 from utils.camera_motion import camera_params
-from utils.cl_geometry import project_to_cl, load_all_cls, random_points_in_sphere, random_perpendicular_vector
+from utils.cl_geometry import project_to_cl, load_all_cls, random_points_in_sphere, random_perpendicular_vector, in_mesh_bounds
 from domain_transfer.similarity import comb_corr_sim
 
 def get_args():
@@ -25,7 +25,7 @@ def get_args():
 	parser.add_argument("--em-idx", type = int, default = 0)
 	parser.add_argument("--step-size", type = int, default = 8)
 	parser.add_argument("--window-size", type = int, default = 224)
-	parser.add_argument("--focal-scale", type = float, default = 100)
+	parser.add_argument("--focal-scale", type = float, default = 0)
 	parser.add_argument("--position-scale", type = float, default = 7)
 	parser.add_argument("--orientation-scale", type = float, default = 0.3)
 	parser.add_argument("--focal-samples", type = int, default = 1)
@@ -97,16 +97,20 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 	#p1.add_mesh(surface, opacity = 0.5)
 
 	st_time = time.time()
+	n_oob = 0
 
 	for t_focal, t_position, t_orientation, t_up in all_sampled_params:
 		#p1.add_mesh(pv.Arrow(t_position, t_orientation), color = "red")
 		#p1.add_mesh(pv.Arrow(t_position, t_up), color = "green")
+		if not in_mesh_bounds(t_position, all_cls):
+			n_oob += 1
+			continue
 		this_corr_params = get_fixed_corr(real_depth_map, p, t_focal, t_position, t_orientation, t_up)
 		if this_corr_params[0] > best_corr_params[0]:
 			best_corr_params = this_corr_params
 			better_params_found = True
 	
-	print("{:.2f} trys per second".format(len(all_sampled_params) / (time.time() - st_time)))
+	print("{:.2f} trys per second. OOB rate: {:.4f}".format(len(all_sampled_params) / (time.time() - st_time), n_oob / len(all_sampled_params)))
 	# 185 trys per second
 	#p1.show()
 
