@@ -4,14 +4,22 @@ import kornia.geometry as KG
 
 lbd = 0.3
 
-def img_corr(inp, tgt):
+def corr_loss_img(inp, tgt, threshold = 0):
 	inp, tgt = inp.flatten(), tgt.flatten()
-	dt = torch.stack([inp[inp > 0], tgt[inp > 0]], axis = 0)
-	return torch.corrcoef(dt)[1][0]
+	dt = torch.stack([inp[inp > threshold], tgt[inp > threshold]], axis = 0)
+	return -torch.corrcoef(dt)[1][0]
 
 def corr_loss(b_inp, b_tgt):
-	losses = sum([-img_corr(inp, tgt) + lbd * torch.sum(inp == 0) for inp, tgt in zip(torch.unbind(b_inp), torch.unbind(b_tgt))])
+	losses = sum([corr_loss_img(inp, tgt) + lbd * torch.sum(inp == 0) for inp, tgt in zip(torch.unbind(b_inp), torch.unbind(b_tgt))])
 	return losses
+
+def corr_loss_kornia(q, lbd):
+	def loss_fun(inp, tgt, reduction = "none"):
+		threshold = torch.quantile(inp, q).detach()
+		loss_v = corr_loss_img(inp, tgt, threshold) + lbd * torch.sum(inp == 0)
+		print(loss_v.item())
+		return torch.ones_like(inp) * loss_v
+	return loss_fun
 
 class TransformRigidBody(nn.Module):
 	def __init__(self, batch_size, height, width):

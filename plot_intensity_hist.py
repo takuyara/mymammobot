@@ -18,24 +18,22 @@ def get_values(x, c):
 		res.extend([tx for __ in range(int(tc * M))])
 	return np.array(res)
 
-def get_hist(x, bin_lims):
-	cdf = np.zeros_like(bin_lims)
-	pdf = np.zeros_like(bin_lims)
-	for i, t_lim in enumerate(bin_lims):
-		cdf[i] = np.sum(x < t_lim)
-	for i in range(len(bin_lims)):
-		pdf[i] = cdf[i] - (0 if i == 0 else cdf[i - 1]) + eps
-	pdf = pdf / np.sum(pdf)
-	return pdf
-
-def kl_div(p, q):
-	#p, q = p[p > 0], q[p > 0]
-	#p, q = p[q > 0], q[q > 0]
-	return np.sum(p * np.log(p / q))
 
 def main():
 	em_hist = np.load("em_hist.npy")
 	ct_hist = np.load("ct_hist.npy")
+
+	plt.subplot(1, 2, 1)
+	plt.bar(range(256), em_hist)
+	plt.ylim(0, 0.04)
+	plt.title("EM Intensity Histogram")
+	plt.subplot(1, 2, 2)
+	plt.bar(range(256), ct_hist)
+	plt.ylim(0, 0.04)
+	plt.title("CT Intensity Histogram")
+	plt.show()
+
+
 	x_ct = np.arange(256)
 	em_v = get_values(x_ct, em_hist)
 	ct_v = get_values(x_ct, ct_hist)

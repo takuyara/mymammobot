@@ -1,76 +1,58 @@
-dir_list = [
-	#"E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_14-53-18_Tasos\\EM",
-	#"E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_15-03-49_Sam\\EM",
-	#"E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_15-09-47_Sam\\EM",
-	"E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_16-04-19_Phantom_1\\EM",
-	#"E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_17-08-08_Phantom_2\\EM",
-	#"E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_17-12-48_Phantom_3\\EM",
-	]
-
-import numpy as np
 import os
-import matplotlib.pyplot as plt
-from matplotlib import animation
-from mpl_toolkits.mplot3d import Axes3D
+import argparse
+import numpy as np
+import pyvista as pv
+from tqdm import tqdm
+from scipy.spatial.transform import Rotation as R
 
-titles = ["x_trans", "y_trans", "z_trans", "q_1", "q_2", "q_3", "q_4"]
-fps = 5
+from utils.cl_geometry import project_to_cl, load_all_cls
 
-all_velocities = []
+def get_args():
+	parser = argparse.ArgumentParser()
+	parser.add_argument("--mesh-path", type = str, default = "./meshes/Airway_Phantom_AdjustSmooth.stl")
+	parser.add_argument("--em-base-path", type = str, default = "./depth-images")
+	parser.add_argument("--cl-base-path", type = str, default = "./CL")
+	parser.add_argument("--em-idx", type = int, default = 0)
+	parser.add_argument("--plot-traj", action = "store_true", default = False)
+	parser.add_argument("--plot-dir", action = "store_true", default = False)
+	parser.add_argument("--proj2cl", action = "store_true", default = False)
+	parser.add_argument("-l", "--l", type = int, default = 0)
+	parser.add_argument("-r", "--r", type = int, default = 10000)
+	return parser.parse_args()
 
-def func(num, data, line):
-	line.set_data(data[ : num, 0], data[ : num, 1])
-	line.set_3d_properties(data[ : num, 2])
+def main():
+	args = get_args()
 
+	surface = pv.read(args.mesh_path)
+	p = pv.Plotter()
+	p.add_mesh(surface, opacity = 0.5)
+	all_cls = load_all_cls(args.cl_base_path)
+	points = []
+	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
+	for i in tqdm(range(args.l, min(len(os.listdir(em_path)) // 2, args.r))):
+		position = np.loadtxt(os.path.join(em_path, f"{i:06d}.txt")).reshape(-1)
+		translation = position[ : 3]
+		quaternion = position[3 : ]
+		if args.proj2cl:
+			translation = project_to_cl(translation, all_cls)
+		points.append(translation)
+		if args.plot_dir:
+			orientation = R.from_quat(quaternion).apply(np.array([0, 0, 1]))
+			orientation = orientation / np.linalg.norm(orientation)
+			p.add_mesh(pv.Arrow(translation, orientation), color = "red")
+			orientation = R.from_quat(quaternion).apply(np.array([0, 1, 0]))
+			orientation = orientation / np.linalg.norm(orientation)
+			p.add_mesh(pv.Arrow(translation, orientation), color = "blue")
+			orientation = R.from_quat(quaternion).apply(np.array([1, 0, 0]))
+			orientation = orientation / np.linalg.norm(orientation)
+			p.add_mesh(pv.Arrow(translation, orientation), color = "green")
 
-for this_dir in dir_list:
-	this_velocities = []
-	this_positions = []
-	for i in range(len(os.listdir(this_dir))):
-		with open(os.path.join(this_dir, f"{i}.txt")) as f:
-			this_num = np.array([float(x) for x in f.read().split()])
-		this_positions.append(this_num)
-		if i > 0:
-			all_velocities.append(this_num - prev_num)
-			this_velocities.append(this_num - prev_num)
-		prev_num = this_num
-	this_velocities = np.stack(this_velocities, axis = 0)
-	this_positions = np.stack(this_positions, axis = 0)
-	
-	fig = plt.figure()
-	ax = fig.add_subplot(111, projection = "3d")
-	line = plt.plot(this_positions[ : , 0], this_positions[ : , 1], this_positions[ : , 2])[0]
-	this_name = "_".join(this_dir.split("\\")[-2].split("_")[3 : ])
-	ax.set_xlabel("x")
-	ax.set_ylabel("y")
-	ax.set_zlabel("z")
-	ax.set_title("Trajectory for {}".format(this_name))
-	line_ani = animation.FuncAnimation(fig, func, frames = len(this_positions), fargs = (this_positions[ : , : 3], line), interval = 1 / fps)
-	#line_ani.save(f"{this_name}.mp4")
-	
-	plt.show()
+	if args.plot_traj:
+		poly = pv.lines_from_points(np.array(points))
+		tube = poly.tube(radius = 0.05)
+		p.add_mesh(tube, color = "black")
 
-	"""
-	for i in range(7):
-		plt.plot(this_velocities[ : , i])
-		plt.title(titles[i])
-		plt.xlabel("Frame")
-		plt.ylabel("Velocity")
-		plt.show()
-	"""
+	p.show()
 
-
-all_velocities = np.stack(all_velocities, axis = 0)
-for i in range(7):
-	np.save(f"{titles[i]}.npy", all_velocities[ : , i])
-	print(np.mean(all_velocities[ : , i]), np.std(all_velocities[ : , i]))
-
-"""
-for i in range(7):
-	plt.subplot(2, 4, i + 1)
-	plt.hist(all_velocities[ : , i], bins = 500)
-	plt.xlabel("Velocity value")
-	plt.ylabel("Density")
-	plt.title(titles[i])
-plt.show()
-"""
+if __name__ == '__main__':
+	main()

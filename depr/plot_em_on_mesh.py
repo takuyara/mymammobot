@@ -17,7 +17,7 @@ def em_to_poly(path):
 		points.append(this_num[ : 3])
 		all_res.append([i] + this_num)
 	points = np.array(points)
-	poly = pv.lines_from_points(points[ : 108])
+	poly = pv.lines_from_points(points)
 	tube = poly.tube(radius = 0.5)
 	"""
 	with open("emcoords.csv", "w", newline = "") as f:

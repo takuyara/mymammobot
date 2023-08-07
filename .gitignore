@@ -162,3 +162,4 @@ t1.txt
 *.zip
 emcoords.csv
 rename_files.py
+*_vis
