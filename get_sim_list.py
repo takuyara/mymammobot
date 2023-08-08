@@ -181,4 +181,4 @@ if __name__ == '__main__':
 	#write_sim_list()
 	#plot_sim_list()
 	#plot_corr_mega()
-	plot_bf_fix(0)
+	plot_bf_fix(0, 1)

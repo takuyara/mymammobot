@@ -21,18 +21,19 @@ def get_args():
 	parser.add_argument("--cl-base-path", type = str, default = "./CL")
 	parser.add_argument("--output-metadata", type = str, default = "register_params.csv")
 	parser.add_argument("--filter-oob", action = "store_true", default = False)
-	parser.add_argument("--try-idx", type = int, default = 0)
-	parser.add_argument("--pool-size", type = int, default = 10)
 	parser.add_argument("--em-idx", type = int, default = 0)
+	parser.add_argument("--try-idx", type = int, default = 0)
+	parser.add_argument("--init-idx", type = int, default = 0)
+	parser.add_argument("--pool-size", type = int, default = 7)
 	parser.add_argument("--step-size", type = int, default = 8)
 	parser.add_argument("--window-size", type = int, default = 224)
 	parser.add_argument("--focal-scale", type = float, default = 0)
-	parser.add_argument("--position-scale", type = float, default = 7)
-	parser.add_argument("--orientation-scale", type = float, default = 0.3)
+	parser.add_argument("--position-scale", type = float, default = 8)
+	parser.add_argument("--orientation-scale", type = float, default = 0.4)
 	parser.add_argument("--focal-samples", type = int, default = 1)
-	parser.add_argument("--position-samples", type = int, default = 40)
-	parser.add_argument("--orientation-samples", type = int, default = 25)
-	parser.add_argument("--up-samples", type = int, default = 20)
+	parser.add_argument("--position-samples", type = int, default = 45)
+	parser.add_argument("--orientation-samples", type = int, default = 30)
+	parser.add_argument("--up-samples", type = int, default = 30)
 	return parser.parse_args()
 
 def get_depth_map(p, focal_length, camera_position, camera_orientation, up_direction, get_outputs = False):
@@ -121,7 +122,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 
 	with open(args.output_metadata, "a", newline = "") as f:
 		writer = csv.writer(f)
-		writer.writerow([args.em_idx, frame_idx] + list(best_corr_params) + ["Y" if better_params_found else "N"])
+		writer.writerow([args.em_idx, frame_idx] + list(best_corr_params) + ["Y" if better_params_found else "N", args.try_idx])
 
 	print(f"Frame {frame_idx} done.", flush = True)
 
@@ -133,7 +134,7 @@ def main():
 	os.makedirs(output_path, exist_ok = True)
 
 	pool = Pool(args.pool_size)
-	for i in range(0, len(os.listdir(em_path)) // 2, args.step_size):
+	for i in range(args.init_idx, len(os.listdir(em_path)) // 2, args.step_size):
 		pool.apply_async(fix_single_frame, args = (i, em_path, em_depth_path, output_path, args))
 	pool.close()
 	pool.join()
