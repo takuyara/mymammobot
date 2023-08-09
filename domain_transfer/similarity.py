@@ -1,9 +1,10 @@
+import torch
 import numpy as np
 from utils.stats import get_num_bins, weighted_corr
 
 dark_threshold_r = 3
 dark_threshold_v = 8
-dark_weight = 0.6
+dark_weight = 0.4
 
 def adjust_hist(h, eps = 1e-6):
 	h = h + eps
@@ -33,11 +34,9 @@ def mi_sim(img1, img2, num_bins = 20):
 	mi = np.sum(pxy[indices] * np.log(pxy[indices] / px_py[indices]))
 	return mi
 
-def comb_corr_sim(img1, img2, dom_1 = "r", dom_2 = "v"):
-	# img2 should be in virtual domain!
+def comb_corr_sim(img1, img2):
+	# img1: SFS, img2: Mesh
 	img1, img2 = img1.flatten(), img2.flatten()
-	dark_mask1 = img1 <= (dark_threshold_r if dom_1 == "r" else dark_threshold_v)
-	dark_mask2 = img2 <= (dark_threshold_r if dom_2 == "r" else dark_threshold_v)
 	weights = np.ones_like(img1)
-	weights[np.logical_and(dark_mask1, dark_mask2)] = dark_weight
+	weights[img1 < dark_threshold_r] = dark_weight
 	return weighted_corr(img1, img2, weights)

@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.stats as st
 import warnings
+import torch
 from scipy.stats._continuous_distns import _distn_names
 
 def get_num_bins(x):
@@ -36,13 +37,15 @@ def get_pdf_curve(distrib, params, num_points = 10000, eps = 1e-4):
 	return x, y
 
 def weighted_mean(x, w):
-	return np.sum(x * w) / np.sum(w)
+	return (x * w).sum() / w.sum()
 
 def weighted_cov(x, y, w):
-	return np.sum(w * (x - weighted_mean(x, w)) * (y - weighted_mean(y, w))) / np.sum(w)
+	return (w * (x - weighted_mean(x, w)) * (y - weighted_mean(y, w))).sum() / w.sum()
 
 def weighted_corr(x, y, w):
+	top = weighted_cov(x, y, w)
 	bot = (weighted_cov(x, x, w) * weighted_cov(y, y, w)) ** 0.5
+	top, bot = float(top), float(bot)
 	if abs(bot) < 1e-10:
 		return -2
-	return weighted_cov(x, y, w) / bot
+	return top / bot

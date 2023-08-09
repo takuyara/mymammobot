@@ -1,6 +1,7 @@
 import os
 import csv
 import numpy as np
+from utils.geometry import project_point_to_line
 
 def load_cl(base_path, cl_idx):
 	cl_path = os.path.join(base_path, f"CL{cl_idx}.dat")
@@ -25,15 +26,6 @@ def load_all_cls(base_path, n_cls = 100):
 			break
 		all_cls.append((points, radiuses))
 	return all_cls
-
-def project_point_to_line(x, a, b, fix_oob = True):
-	if np.linalg.norm(a - b) == 0:
-		return a
-	x_ = np.dot(x - a, b - a) / np.dot(b - a, b - a) * (b - a) + a
-	if not fix_oob or np.allclose(np.linalg.norm(x_ - a) + np.linalg.norm(x_ - b), np.linalg.norm(a - b)):
-		return x_
-	else:
-		return a if np.linalg.norm(x - a) < np.linalg.norm(x - b) else b
 
 def locate_on_cl(x, all_cls, n_candidates = 50):
 	min_dist = 1e10
@@ -75,16 +67,9 @@ def in_mesh_bounds(x, all_cls, cl_indices, tolerance = 0.5, n_candidates = 50):
 	radius = (radiuses[on_line_idx, ...] * l_dist + radiuses[on_line_idx + 1, ...] * r_dist) / (l_dist + r_dist)
 	return np.linalg.norm(x - proj) <= radius + tolerance
 
-def random_points_in_sphere(num_points, radius = 1, in_sphere = True):
-	vec = np.random.randn(num_points, 3)
-	norms = (np.random.rand(num_points) if in_sphere else np.ones(num_points)) * radius
-	norm_rates = norms / np.linalg.norm(vec, axis = 1)
-	vec = vec * norm_rates.reshape(-1, 1)
-	return vec
-
-def random_perpendicular_vector(num_vectors, ref_vector):
-	r = random_points_in_sphere(num_vectors, radius = 1, in_sphere = False)
-	ref_vector /= np.linalg.norm(ref_vector)
-	res_vector = r - np.sum(r * ref_vector, axis = 1).reshape(-1, 1) * ref_vector.reshape(1, 3)
-	res_vector /= np.linalg.norm(res_vector, axis = 1).reshape(-1, 1)
-	return res_vector
+def get_cl_direction(all_cls, cl_indices):
+	cl_idx, on_line_idx = cl_indices
+	points, radiuses = all_cls[cl_idx]
+	res = points[on_line_idx + 1, ...] - points[on_line_idx, ...]
+	res = res / np.linalg.norm(res)
+	return res

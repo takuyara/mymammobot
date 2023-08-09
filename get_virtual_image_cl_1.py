@@ -93,13 +93,18 @@ positions = savgol_filter(positions, window_size, polyorder, axis = 0)
 orientations = savgol_filter(orientations, window_size, polyorder, axis = 0)
 
 surface = pv.read(mesh_path)
-p = pv.Plotter(off_screen = True)
-p.add_mesh(surface)
+p1 = pv.Plotter(off_screen = True, window_size = (100, 100))
+p2 = pv.Plotter(off_screen = True, window_size = (1000, 1000))
+p3 = pv.Plotter(off_screen = True, window_size = (100, 200))
+ps = [p1, p2, p3]
+for p in ps:
+	p.add_mesh(surface)
+
 camera = pv.Camera()
 camera.clipping_range = clipping_range
 os.makedirs(img_path, exist_ok = True)
 
-for i in range(len(positions)):
+for i in range(10):
 	#quaternion = R.align_vectors(base_orientation.reshape(1, 3), orientations[i].reshape(1, 3))[0].as_quat()
 	#quaternion = R.from_matrix(rotation_matrix_from_vectors(base_orientation, orientations[i])).as_quat()
 	quaternion = compute_rotation_quaternion(base_orientation, orientations[i])
@@ -107,10 +112,14 @@ for i in range(len(positions)):
 	camera.position = positions[i]
 	camera.focal_point = focal_length * orientations[i] + camera.position
 	camera.view_angle = view_angle
-	p.camera = camera
+	for j, p in enumerate(ps):
+		p.camera = camera
+		p.screenshot(os.path.join(img_path, f"{i:06d}-{j}.png"))
+	"""
 	p.show(auto_close = False)
 	img = -p.get_image_depth()
 	img = np.minimum(img, clip_value)
 	img = (img - min_d) / (clip_value - min_d) * 255
 	cv2.imwrite(os.path.join(img_path, f"{i:06d}.png"), img)
 	np.savetxt(os.path.join(img_path, f"{i:06d}.txt"), np.concatenate([positions[i], quaternion]).reshape(1, -1), fmt = "%.5f")
+	"""
