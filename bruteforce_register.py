@@ -34,7 +34,7 @@ def get_args():
 	parser.add_argument("--orientation-scale", type = float, default = 0.3)
 	parser.add_argument("--focal-samples", type = int, default = 1)
 	parser.add_argument("--position-samples", type = int, default = 30)
-	parser.add_argument("--orientation-samples", type = int, default = 30)
+	parser.add_argument("--orientation-samples", type = int, default = 10)
 	parser.add_argument("--up-samples", type = int, default = 30)
 	return parser.parse_args()
 
