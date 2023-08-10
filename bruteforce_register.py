@@ -8,7 +8,6 @@ import cv2
 import csv
 import argparse
 import time
-import torch
 from multiprocessing import Pool
 
 from utils.camera_motion import camera_params
@@ -52,7 +51,7 @@ def get_depth_map(p, focal_length, camera_position, camera_orientation, up_direc
 	if get_outputs:
 		return p.screenshot(None, return_img = True), -p.get_image_depth()
 	else:
-		return torch.tensor(-p.get_image_depth()).cuda()
+		return -p.get_image_depth()
 
 def get_fixed_corr(ref_depth_map, p, focal_length, camera_position, camera_orientation, up_direction):
 	depth_map = get_depth_map(p, focal_length, camera_position, camera_orientation, up_direction)
@@ -90,7 +89,6 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 
 	raw_position = np.loadtxt(os.path.join(em_path, f"{frame_idx:06d}.txt")).reshape(-1)
 	real_depth_map = np.load(os.path.join(em_depth_path, f"{frame_idx:06d}.npy"))
-	real_depth_map = torch.tensor(real_depth_map).cuda()
 	translation, quaternion = raw_position[ : 3], raw_position[3 : ]
 	translation, cl_indices = project_to_cl(translation, all_cls, return_cl_indices = True)
 	orientation = R.from_quat(quaternion).apply(camera_params["forward_direction"])
@@ -119,7 +117,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 		virtual_depth_map = get_depth_map(p, t_focal, t_position, t_orientation, t_up)
 		for j in range(4):
 			if j > 0:
-				virtual_depth_map = torch.rot90(virtual_depth_map)
+				virtual_depth_map = np.rot90(virtual_depth_map)
 			#confirm_depth_map = get_depth_map(p, t_focal, t_position, t_orientation, rotate_single_vector(t_up, t_orientation, 360 - j * 90))
 			"""
 			plt.subplot(1, 2, 1)
@@ -141,7 +139,7 @@ def fix_single_frame(frame_idx, em_path, em_depth_path, output_path, args):
 	#p1.show()
 
 	rgb_img, dep_img = get_depth_map(p, *best_corr_params[1 : ], get_outputs = True)
-	test_error = abs(comb_corr_sim(real_depth_map, torch.tensor(dep_img).cuda()) - best_corr_params[0])
+	test_error = abs(comb_corr_sim(real_depth_map, dep_img) - best_corr_params[0])
 	if test_error > 1e-4:
 		print(f"Wrong Answer at {em_path} {frame_idx}: {test_error:.7f}")
 	cv2.imwrite(os.path.join(output_path, f"{frame_idx:06d}.png"), cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR))
@@ -165,9 +163,8 @@ def main():
 		pool.apply_async(fix_single_frame, args = (i, em_path, em_depth_path, output_path, args))
 	pool.close()
 	pool.join()
-	
+
 	#fix_single_frame(0, em_path, em_depth_path, output_path, args)
-	
 
 if __name__ == '__main__':
 	main()
