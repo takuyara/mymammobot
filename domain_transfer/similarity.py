@@ -37,6 +37,6 @@ def mi_sim(img1, img2, num_bins = 20):
 def comb_corr_sim(img1, img2):
 	# img1: SFS, img2: Mesh
 	img1, img2 = img1.flatten(), img2.flatten()
-	weights = np.ones_like(img1)
+	weights = torch.ones_like(img1)
 	weights[img1 < dark_threshold_r] = dark_weight
 	return weighted_corr(img1, img2, weights)
