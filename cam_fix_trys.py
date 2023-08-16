@@ -14,7 +14,7 @@ from utils.camera_motion import camera_params
 from utils.cl_utils import project_to_cl, load_all_cls, in_mesh_bounds, get_cl_direction
 from utils.geometry import random_points_in_sphere, arbitrary_perpendicular_vector, rotate_single_vector, rotate_all_degrees, get_vector_angle, random_perpendicular_offsets
 from domain_transfer.similarity import comb_corr_sim
-from domain_transfer.alignment import reg_depth_maps
+#from domain_transfer.alignment import reg_depth_maps
 
 default_params = {
 	"coarse": {
