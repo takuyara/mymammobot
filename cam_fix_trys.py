@@ -54,6 +54,7 @@ def get_args():
 	parser.add_argument("--position-samples", type = int, default = 30)
 	parser.add_argument("--orientation-samples", type = int, default = 30)
 	parser.add_argument("--up-samples", type = int, default = 10)
+	parser.add_argument("--uses_new_rotation", action = "store_true", default = False)
 	return parser.parse_args()
 
 def get_depth_map(p, focal_length, camera_position, camera_orientation, up_direction, get_outputs = False, zoom = 1.0):
@@ -467,8 +468,8 @@ def main():
 	plt.show()
 	"""
 
-	
-	fix_camera_pose(frame_idx, em_path, em_depth_path, output_path, args)
+	for frame_idx in range(20):
+		fix_camera_pose(frame_idx, em_path, em_depth_path, output_path, args)
 
 	#fix_single_frame(0, em_path, em_depth_path, output_path, args)
 
