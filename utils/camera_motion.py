@@ -3,7 +3,7 @@ from scipy.stats import fatiguelife
 
 # Camera parameters
 camera_params = {}
-camera_params["focal_length"] = 350
+camera_params["focal_length"] = 10
 camera_params["view_angle"] = 120
 camera_params["up_direction"] = np.array([1, 0, 0])
 camera_params["forward_direction"] = np.array([0, 0, 1])

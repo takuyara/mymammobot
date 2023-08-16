@@ -15,6 +15,23 @@ from utils.cl_utils import project_to_cl, load_all_cls, in_mesh_bounds, get_cl_d
 from utils.geometry import random_points_in_sphere, arbitrary_perpendicular_vector, rotate_single_vector, rotate_all_degrees, get_vector_angle
 from domain_transfer.similarity import comb_corr_sim
 
+default_params = {
+	"coarse": {
+		"position_scale": 7,
+		"position_samples": 30,
+		"orientation_scale": 0.3,
+		"orientation_samples": 30,
+		"up_samples": 10,
+	},
+	"fine": {
+		"position_scale": 2,
+		"position_samples": 15,
+		"orientation_scale": 0.1,
+		"orientation_samples": 15,
+		"up_samples": 30,
+	},
+}
+
 def get_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--mesh-path", type = str, default = "./meshes/Airway_Phantom_AdjustSmooth.stl")

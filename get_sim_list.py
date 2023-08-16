@@ -6,6 +6,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from copy import deepcopy
 import shutil
+import sys
 
 from utils.stats import get_num_bins
 from domain_transfer.similarity import kl_sim, corr_sim, mi_sim, comb_corr_sim, dark_threshold_v, dark_threshold_r
@@ -18,6 +19,7 @@ centrelines = [0]
 out_csv_name = "sim_list_xneg.csv"
 comp_metadata = "./register_params.csv"
 select_result = "./select_result.csv"
+try_selects = "./best_trys.csv"
 
 def write_sim_list():
 	all_res = [["em_idx", "img_idx", "kl_sim", "corr_sim", "mi_sim"]]
@@ -126,6 +128,28 @@ def plot_bf_fix(em_idx, try_idx = 0):
 		plt.savefig(os.path.join(eval_path, f"{img_idx:06d}.png"))
 		plt.clf()
 
+
+def plot_max_depth():
+	all_rds, all_fds = [], []
+	with open(try_selects, newline = "") as f:
+		reader = csv.reader(f)
+		for row in reader:
+			em_idx = int(row[0])
+			img_idx = int(row[1])
+			try_idx = int(row[2])
+			if try_idx != -1:
+				rd = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+				fd = np.load(os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{try_idx}", f"{img_idx:06d}.npy"))
+				all_rds.append(rd.max())
+				all_fds.append(fd.max())
+				if fd.max() > 100:
+					print(em_idx, try_idx, img_idx)
+	plt.scatter(all_rds, all_fds)
+	plt.xlabel("SFS depth")
+	plt.ylabel("Virtual depth")
+	plt.show()
+
+
 def plot_fix_maxfit(em_indices):
 	best_corrs = {}
 	with open(comp_metadata, newline = "") as f:
@@ -175,12 +199,86 @@ def find_correspond_tryidx():
 
 	# copy and fix: 5388+
 
+def select_between_candidates(em_idx, try_indices, out_index):
+	key2adj = {"q": "trans", "w": "orient", "e": "up", "r": "wrong", "a": "available"}
+	fix_path = os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{try_indices[0]}")
+	out_path = os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{out_index}")
+	os.makedirs(out_path, exist_ok = True)
+	img_indices = []
+	for fixed_map_path in os.listdir(fix_path):
+		if fixed_map_path.endswith(".npy"):
+			img_indices.append(int(fixed_map_path.replace(".npy", "")))
+	fig, ax = plt.subplots()
+	for img_idx in img_indices:
+		# 0~528 no right/wrong info, have correction info.
+		# 536~916 no right/wrong info, no correction info.
+		# 916+: have wrong info, no correct / need modify info, no correction info.
+		plt.clf()
+		plt.subplot(3, 4, 1)
+		r_rgb = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"))
+		plt.imshow(r_rgb)
+		plt.title("Real Frame")
+		for i, try_idx in enumerate(try_indices):
+			plt.subplot(3, 4, 5 + i)
+			f_rgb = cv2.imread(os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{try_idx}", f"{img_idx:06d}.png"))
+			plt.imshow(f_rgb)
+			plt.title(f"Choice {i + 1}")
+		plt.suptitle(f"EM {em_idx} {img_idx}")
+		fig.canvas.draw()
+		img_arr = np.array(fig.canvas.renderer.buffer_rgba())
+		img_arr = cv2.cvtColor(img_arr, cv2.COLOR_RGBA2BGR)
+		img_arr = cv2.resize(img_arr, (1200, 900))
+		best_choice, best_adj = None, []
+		while True:
+			cv2.imshow("img_select", img_arr)
+			key = cv2.waitKey(0) & 0xFF
+			for i in range(len(try_indices)):
+				if key == ord(f"{i + 1}"):
+					best_choice = i
+					#print("Best choice: ", i)
+			if key == ord("`"):
+				best_choice = -1
+				break
+			if best_choice is not None:
+				if key == ord("r"):
+					best_adj.append("need_modify")
+					break
+				elif key == ord("t"):
+					best_adj.append("can_be_used")
+					break
+			"""
+			if best_choice is not None:
+				print("In search adj")
+				for adj in ["q", "w", "e", "r", "a"]:
+					if key == ord(adj):
+						best_adj.append(key2adj[adj])
+						print("Added adj")
+				if len(best_adj) > 0 and key == ord("t"):
+					print("Quit.")
+					break
+			"""
+		print(best_choice, best_adj)
+		src_path = os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{try_indices[best_choice]}")
+		shutil.copy(os.path.join(src_path, f"{img_idx:06d}.png"), os.path.join(out_path, f"{img_idx:06d}.png"))
+		shutil.copy(os.path.join(src_path, f"{img_idx:06d}.npy"), os.path.join(out_path, f"{img_idx:06d}.npy"))
+		with open(try_selects, "a", newline = "") as f:
+			writer = csv.writer(f)
+			writer.writerow([em_idx, img_idx, try_indices[best_choice] if best_choice != -1 else -1, try_indices] + best_adj)
+
 def manually_select_alignment(em_idx, try_idx):
+	# Y, 1: Correctly aligned. Could use small adjustions.
+	# N, 0: Nothing alike. Need much larger displacements.
+	# R, 2: Looked on the correct direction. Need small adjustment or large rotations.
+
+	fix_path = os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{try_idx}")
 	eval_path = os.path.join(em_base_path, f"EM-virtual-autofix-eval-{em_idx}-{try_idx}")
-	y_path = os.path.join(em_base_path, f"EM-virtual-autofix-eval-{em_idx}-{try_idx}-good")
-	n_path = os.path.join(em_base_path, f"EM-virtual-autofix-eval-{em_idx}-{try_idx}-bad")
+	y_path = os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{try_idx}-good")
+	n_path = os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{try_idx}-bad")
+	r_path = os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{try_idx}-rot")
 	os.makedirs(y_path, exist_ok = True)
 	os.makedirs(n_path, exist_ok = True)
+	os.makedirs(r_path, exist_ok = True)
+
 	for out_img_name in os.listdir(eval_path):
 		img_idx = int(out_img_name.replace(".png", ""))
 		img = cv2.imread(os.path.join(eval_path, out_img_name))
@@ -195,6 +293,10 @@ def manually_select_alignment(em_idx, try_idx):
 			elif key == ord("n"):
 				out_path = n_path
 				op = 0
+				break
+			elif key == ord("r"):
+				out_path = r_path
+				op = 2
 				break
 		shutil.copy(os.path.join(em_base_path, f"EM-virtual-autofix-{em_idx}-{try_idx}", out_img_name), os.path.join(out_path, out_img_name))
 		out_img_name = out_img_name.replace(".png", ".npy")
@@ -264,7 +366,14 @@ if __name__ == '__main__':
 	#write_sim_list()
 	#plot_sim_list()
 	#plot_corr_mega()
-	#plot_bf_fix(2, 4)
+	#plot_bf_fix(0, 8)
 	#find_correspond_tryidx()
 	#plot_fix_maxfit([0, 1, 2])
-	manually_select_alignment(0, 3)
+	#select_between_candidates(2, [2, 3, 4, 8, 9], 100)
+	plot_max_depth()
+	"""
+	if sys.argv[1] == "eval":
+		plot_bf_fix(ing(sys.argv[2]), int(sys.argv[3]))
+	if sys.argv[1] == "select":
+		manually_select_alignment(int(sys.argv[2]), int(sys.argv[3]))
+	"""

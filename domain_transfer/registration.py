@@ -13,6 +13,7 @@ def corr_loss(b_inp, b_tgt):
 	losses = sum([corr_loss_img(inp, tgt) + lbd * torch.sum(inp == 0) for inp, tgt in zip(torch.unbind(b_inp), torch.unbind(b_tgt))])
 	return losses
 
+"""
 def corr_loss_kornia(q, lbd):
 	def loss_fun(inp, tgt, reduction = "none"):
 		threshold = torch.quantile(inp, q).detach()
@@ -20,6 +21,10 @@ def corr_loss_kornia(q, lbd):
 		print(loss_v.item())
 		return torch.ones_like(inp) * loss_v
 	return loss_fun
+"""
+
+def corr_loss_kornia(inp, tgt, reduction = "none"):
+	return torch.ones_like(inp) * corr_loss_img(inp, tgt)
 
 class TransformRigidBody(nn.Module):
 	def __init__(self, batch_size, height, width):

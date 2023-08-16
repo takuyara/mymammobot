@@ -18,11 +18,16 @@ def random_points_in_sphere(num_points, radius = 1, in_sphere = True):
 
 # Vector: input unit, output unit
 
-def random_perpendicular_vector(num_vectors, ref_vector):
+def random_perpendicular_vectors(num_vectors, ref_vector):
 	r = random_points_in_sphere(num_vectors, radius = 1, in_sphere = False)
 	res_vector = r - np.sum(r * ref_vector, axis = 1).reshape(-1, 1) * ref_vector.reshape(1, 3)
 	res_vector /= np.linalg.norm(res_vector, axis = 1).reshape(-1, 1)
 	return res_vector
+
+def random_perpendicular_offsets(num_offsets, ref_vector, max_offset):
+	vectors = random_perpendicular_vectors(num_offsets, ref_vector)
+	vectors *= (np.random.rand(num_offsets, 1) * max_offset)
+	return vectors
 
 def arbitrary_perpendicular_vector(ref_vector):
 	r = np.array([1, 0, 0])
