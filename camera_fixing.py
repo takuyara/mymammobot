@@ -97,13 +97,15 @@ def main():
 	output_path = os.path.join(args.em_base_path, f"EM-newfix-{args.em_idx}-{args.try_idx}")
 	os.makedirs(output_path, exist_ok = True)
 
+	"""
 	pool = Pool(args.pool_size)
 	for i in range(args.init_idx, len(os.listdir(em_path)) // 2, args.step_size):
 		pool.apply_async(fix_single_image, args = (args, i, output_path))
 	pool.close()
 	pool.join()
+	"""
 	
-	#fix_single_image(args, 1416, output_path)
+	fix_single_image(args, 1416, output_path)
 
 if __name__ == '__main__':
 	main()
