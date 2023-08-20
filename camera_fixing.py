@@ -4,6 +4,7 @@ import cv2
 import time
 import argparse
 import numpy as np
+from multiprocessing import Pool
 from scipy.spatial.transform import Rotation as R
 
 from pose_fixing.evo_strat import EvolutionStrategy
