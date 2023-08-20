@@ -63,6 +63,7 @@ def get_depth_map(p, focal_length, camera_position, camera_orientation, up_direc
 	camera.focal_point = camera_position + focal_length * camera_orientation
 	camera.up = up_direction
 	camera.view_angle = camera_params["view_angle"]
+	camera.clipping_range = camera_params["clipping_range"]
 	p.camera = camera
 	p.show(auto_close = False)
 	if get_outputs:

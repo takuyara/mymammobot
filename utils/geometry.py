@@ -40,12 +40,19 @@ def get_rotation_matrix(axis, theta2):
 	return np.array([[a * a + b * b - c * c - d * d, 2 * (b * c - a * d), 2 * (b * d + a * c)], [2 * (b * c + a * d),
 		a * a + c * c - b * b - d * d, 2 * (c * d - a * b)], [2 * (b * d - a * c), 2 * (c * d + a * b), a * a + d * d - b * b - c * c]])
 
-def rotate_all_degrees(base, axis, num_degrees):
-	degrees = np.deg2rad(np.arange(num_degrees) * 90 / num_degrees) / 2
+def rotate_all_degrees(base, axis, num_degrees, max_degree = 360):
+	degrees = np.deg2rad(np.arange(num_degrees) * max_degree / num_degrees) / 2
 	return [np.dot(get_rotation_matrix(axis, deg), base) for deg in degrees]
 
 def rotate_single_vector(base, axis, theta_deg):
-	return np.dot(get_rotation_matrix(axis, np.deg2rad(theta_deg) / 2), base)
+	res = np.dot(get_rotation_matrix(axis, np.deg2rad(theta_deg) / 2), base)
+	return res / np.linalg.norm(res)
 
 def get_vector_angle(a, b):
-	return np.arccos(np.clip(np.dot(a, b), -1, 1))
+	return np.rad2deg(np.arccos(np.clip(np.dot(a, b), -1, 1)))
+
+def get_rotate_angle(src, tgt, axis):
+	a = get_vector_angle(src, tgt)
+	a1 = get_vector_angle(rotate_single_vector(src, axis, a), tgt)
+	a2 = get_vector_angle(rotate_single_vector(src, axis, -a), tgt)
+	return a if a1 < a2 else -a

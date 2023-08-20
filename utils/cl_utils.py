@@ -73,3 +73,6 @@ def get_cl_direction(all_cls, cl_indices):
 	res = points[on_line_idx + 1, ...] - points[on_line_idx, ...]
 	res = res / np.linalg.norm(res)
 	return res
+
+def get_segmented_cls(all_cls):
+	seg_points, seg_radiuses = [], []

@@ -2,6 +2,7 @@ import pyvista as pv
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
+from scipy.spatial.distance import directed_hausdorff as DHD
 import os
 from tqdm import tqdm
 import cv2
@@ -10,10 +11,13 @@ import argparse
 import time
 from multiprocessing import Pool
 
-from utils.camera_motion import camera_params
+from ds_gen.camera_features import camera_params
 from utils.cl_utils import project_to_cl, load_all_cls, in_mesh_bounds, get_cl_direction
 from utils.geometry import random_points_in_sphere, arbitrary_perpendicular_vector, rotate_single_vector, rotate_all_degrees, get_vector_angle, random_perpendicular_offsets
-from domain_transfer.similarity import comb_corr_sim
+from pose_fixing.similarity import comb_corr_sim, reg_mse_sim
+from ds_gen.depth_map_generation import get_depth_map
+from pose_fixing.move_camera import randomise_params
+from utils.stats import weighted_corr
 #from domain_transfer.alignment import reg_depth_maps
 
 default_params = {
@@ -57,74 +61,10 @@ def get_args():
 	parser.add_argument("--uses_new_rotation", action = "store_true", default = False)
 	return parser.parse_args()
 
-def get_depth_map(p, focal_length, camera_position, camera_orientation, up_direction, get_outputs = False, zoom = 1.0):
-	camera = pv.Camera()
-	#print(focal_length)
-	camera.position = camera_position
-	# camera.focal_point = camera_position + focal_length * camera_orientation / np.linalg.norm(camera_orientation)
-	# camera.up = up_direction / np.linalg.norm(up_direction)
-	camera.focal_point = camera_position + focal_length * camera_orientation
-	#print("Before: ", focal_length)
-	camera.up = up_direction
-	camera.view_angle = camera_params["view_angle"]
-	camera.zoom(zoom)
-	p.camera = camera
-	p.show(auto_close = False)
-	if get_outputs:
-		return p.screenshot(None, return_img = True), -p.get_image_depth()
-	else:
-		return -p.get_image_depth()
-
 def get_fixed_corr(ref_depth_map, p, focal_length, camera_position, camera_orientation, up_direction):
-	depth_map = get_depth_map(p, focal_length, camera_position, camera_orientation, up_direction)
+	depth_map = get_depth_map(p, camera_position, camera_orientation, up_direction, focal_length = focal_length)
 	corr = comb_corr_sim(ref_depth_map, depth_map)
 	return corr, focal_length, camera_position, camera_orientation, up_direction
-
-"""
-def randomise_params(
-	focal_scale, focal_samples, focal_base,
-	axial_scale, axial_samples, radial_scale, radial_samples, position_base,
-	orientation_scale, orientation_samples, orientation_base,
-	up_samples):
-	all_sampled_params = []
-	focal_offsets = np.random.rand(focal_samples) * focal_scale - focal_scale / 2
-	orientation_offsets = random_points_in_sphere(orientation_samples, orientation_scale)
-	axial_offsets = np.random.rand(axial_samples) * axial_scale - axial_scale / 2
-	for focal_offset in focal_offsets:
-		t_focal = focal_offset + focal_base
-		for orientation_offset in orientation_offsets:
-			t_orientation = orientation_base + orientation_offset
-			t_orientation = t_orientation / np.linalg.norm(t_orientation)
-			radial_offsets = random_perpendicular_offsets(radial_samples, t_orientation, radial_scale)
-			up_vector_base = arbitrary_perpendicular_vector(t_orientation)
-			for axial_offset in axial_offsets:
-				for radial_offset in radial_offsets:
-					t_position = position_base + axial_offset * t_orientation + radial_offset
-					for t_up in rotate_all_degrees(up_vector_base, t_orientation, up_samples):
-						all_sampled_params.append((t_focal, t_position, t_orientation, t_up))
-	return all_sampled_params
-"""
-
-def randomise_params(
-	focal_base,
-	axial_scale, radial_scale, position_base,
-	orientation_scale, orientation_base,
-	num_samples):
-	all_sampled_params = []
-	orientation_offsets = random_points_in_sphere(num_samples, orientation_scale)
-	axial_offsets = np.random.rand(num_samples) * axial_scale - axial_scale / 2
-	for orientation_offset, axial_offset in zip(orientation_offsets, axial_offsets):
-		t_orientation = orientation_base + orientation_offset
-		t_orientation = t_orientation / np.linalg.norm(t_orientation)
-		radial_offset = random_perpendicular_offsets(1, t_orientation, radial_scale)[0, ...]
-		up_vector_base = arbitrary_perpendicular_vector(t_orientation)
-		t_position = position_base + axial_offset * t_orientation + radial_offset
-		"""
-		for t_up in rotate_all_degrees(up_vector_base, t_orientation, up_samples):
-			all_sampled_params.append((focal_base, t_position, t_orientation, t_up))
-		"""
-		all_sampled_params.append((focal_base, t_position, t_orientation, up_vector_base))
-	return all_sampled_params
 
 def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 	surface = pv.read(args.mesh_path)
@@ -133,317 +73,382 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 
 
 	real_depth_map = np.load(os.path.join(em_depth_path, f"{frame_idx:06d}.npy"))
+	real_rgb = cv2.imread(os.path.join(args.em_base_path, f"EM-RGB-{args.em_idx}", f"{frame_idx}.png"))
+	#print(os.path.join(em_depth_path, f"{frame_idx:06d}.npy"), os.path.join(em_path, f"{frame_idx:06d}.png"))
 
 	num_samples = 500
-	up_samples = 20
-	t_position = np.array([-33.79384209, -28.94875791, -160.28407521])
-	t_orientation = np.array([-0.89581517, 0.32385322, -0.30435879])
-	up_vector_base = np.array([0.43895517, 0.53761082, -0.71992567])
+	up_samples = 180
+
+	"""
+	optim_position = np.array([-32.71902941, -25.05143104, -163.36083433])
+	optim_orientation = np.array([-0.87824484, -0.41870292, -0.23102786])
+	optim_up = np.array([ 0.47559157, -0.71424555, -0.51348414])
+	"""
+	#0.8872
+
+	"""
+	max_optim = 0.8872
+	for this_degree in np.arange(-5, 5, 0.2):
+		t_up = rotate_single_vector(optim_up, optim_orientation, this_degree)
+		virtual_depth_map = get_depth_map(p, camera_params["focal_length"], optim_position, optim_orientation, t_up)
+		this_corr = comb_corr_sim(real_depth_map, virtual_depth_map)
+		if this_corr > max_optim:
+			max_optim, best_up = this_corr, t_up
+
+	rgb, virtual_depth_map = get_depth_map(p, camera_params["focal_length"], optim_position, optim_orientation, optim_up, get_outputs = True)
+	
+	plt.clf()
+	plt.subplot(2, 2, 1)
+	plt.imshow(real_depth_map, cmap = "gray")
+	plt.subplot(2, 2, 2)
+	plt.imshow(virtual_depth_map, cmap = "gray")
+	plt.subplot(2, 2, 3)
+	plt.imshow(rgb)
+	plt.subplot(2, 2, 4)
+	plt.scatter(real_depth_map.flatten(), virtual_depth_map.flatten())
+	plt.savefig(os.path.join(output_path, f"{frame_idx:06d}-{max_optim:.4f}.png"))
+	with open(os.path.join(output_path, f"{frame_idx:06d}-{max_optim:.4f}.txt"), "w") as f:
+		out = f"{optim_position}\n{optim_orientation}\n{best_up}\n"
+		f.write(out)
+	plt.show()
+
+
+
+	print("Best corr: ", max_optim, " up: ", t_up)
+	exit()
+	"""
+
+	# Show error in weighted correlation
+
+
+	#Iter 0
+	"""
+	View angle = 120, counter example for weights
+	old_position = np.array([-33.79384209, -28.94875791, -160.28407521])
+	old_orientation = np.array([-0.89581517, 0.32385322, -0.30435879])
+	old_up = np.array([0.43895517, 0.53761082, -0.71992567])
+	#desired_up = rotate_single_vector(old_up, t_orientation, 270)
+
+	new_position = np.array([-32.71902941, -25.05143104, -163.36083433])
+	new_orientation = np.array([-0.87824484, -0.41870292, -0.23102786])
+	new_up = np.array([0.46974083, -0.66481073, -0.58083582])
+	"""
+
+
+	
+	old_position = np.array([-43.13930405, -29.77635236, -160.71365191])
+	old_orientation = np.array([-0.93962246, -0.15040396, -0.30738945])
+	old_up = np.array([0.32958453, -0.15596661, -0.93115437])
+	"""
+	old_position = np.array([-31.68429595, -27.44295559, -161.55171964])
+	old_orientation = np.array([-1.01959425, 0.13263613, -0.18120493])
+	old_up = np.array([-0.17030983, 0.58201775, -0.79514143])
+	"""
+
+	new_position = np.array([-35.23436981, -26.07758012, -161.09738046])
+	new_orientation = np.array([-0.86110491, -0.40747873, -0.30407139])
+	new_up = np.array([0.50811759, -0.71058364, -0.4867108])
+	
+
+	"""
+	Iter 1
+	t_position = np.array([-33.013039, -27.23421861, -162.06400843])
+	t_orientation = np.array([-0.91553654, -0.17466719, -0.36233164])
+	desired_up = np.array([0.34834557, -0.79469893, -0.49710057])
+	"""
+
+	
+	#Iter 2
+	"""
+	t_position = np.array([-32.74093312, -24.63603652, -161.3075079])
+	t_orientation = np.array([-0.74968252, -0.45564735, -0.47996001])
+	desired_up = np.array([0.66018554, -0.56548868, -0.49434564])
+	"""
+	
+
+	"""
+	Iter 3
+	t_position = np.array([-30.59947988, -24.11401394, -160.20225996])
+	t_orientation = np.array([-0.72133924, -0.39416521, -0.56947651])
+	desired_up = np.array([0.69216001, -0.43897778, -0.57289879])
+	"""
+
+	"""
+	virtual_depth_map = get_depth_map(p, camera_params["focal_length"], t_position, t_orientation, desired_up)
+	plt.imshow(virtual_depth_map)
+	plt.show()
+
+	lipu_up = np.array([0.47460083, 0.75710684, -0.44893572])
+
+	virtual_depth_map = get_depth_map(p, camera_params["focal_length"], t_position, t_orientation, lipu_up)
+	plt.imshow(virtual_depth_map)
+	plt.show()
+	print(get_vector_angle(lipu_up, desired_up))
+	"""
+	"""
 	t_up = rotate_single_vector(up_vector_base, t_orientation, 270)
 	t_left = np.cross(t_up, t_orientation)
 	t_left = t_left / np.linalg.norm(t_left)
-
-	axial_scale = 0.5
-	radial_scale = 7
-	axial_samples = 3
-	radial_samples = 3
-	orientation_scale = 0.4
+	"""
 
 	"""
+	t_position = new_position
+	t_orientation = new_orientation
+	desired_up = new_up
+
+	axial_scale = 5
+	radial_scale = 5
+	orientation_scale = 0.5
+
 	all_sampled_params = randomise_params(camera_params["focal_length"],
 		axial_scale, radial_scale, t_position, orientation_scale, t_orientation,
 		num_samples, up_samples)
-	best_corr_params = get_fixed_corr(real_depth_map, p, camera_params["focal_length"], t_position, t_orientation, up_vector_base)
 	"""
-
-
-	#plt.figure(figsize = (20, 15))
-
-	left_offset = -2
-	up_offset = 3
-	axial_offset = 7
-	up_rotate = -7
-	ori_left_offset = -0.3
-	ori_up_offset = 0.5
-	new_position = t_position + left_offset * t_left + up_offset * t_up + axial_offset * t_orientation
-	new_up = rotate_single_vector(t_up, t_orientation, up_rotate)
-	new_orientation = t_orientation + t_up * ori_up_offset + t_left * ori_left_offset
-
-	from sklearn.linear_model import LinearRegression as LR
-
-	def plot_it(rgb, virtual_depth_map, capping_value = 40):
-		rd1, vd1 = real_depth_map.reshape(-1, 1), virtual_depth_map.reshape(-1, 1)
-		vd1 = np.minimum(vd1, capping_value)
-		w = np.ones(rd1.shape[0])
-		w[rd1.flatten() < 3] = 0.3
-		reg = LR().fit(rd1, vd1, w)
-		score = reg.score(rd1, vd1, w)
-		err = (vd1 - reg.predict(rd1)) ** 2
-		err = err.reshape(*virtual_depth_map.shape)
-		"""
-		plt.clf()
-		plt.subplot(2, 2, 1)
-		plt.imshow(real_depth_map, cmap = "gray")
-		plt.subplot(2, 2, 2)
-		plt.imshow(virtual_depth_map, cmap = "gray")
-		plt.subplot(2, 2, 3)
-		#plt.imshow(rgb)
-		plt.imshow(err)
-		plt.colorbar()
-		plt.subplot(2, 2, 4)
-		plt.scatter(real_depth_map.flatten(), virtual_depth_map.flatten())
-		#plt.savefig(os.path.join(output_path, f"res_{left_offset}_{up_offset}_{this_corr}.png"))
-		plt.suptitle(f"{score:.6f}")
-		plt.show()
-		"""
-		return err
-
-	from scipy import ndimage
-
-
-	zoom_scale = 2 ** -0.5
-	half_angle = np.deg2rad(camera_params["view_angle"] / 2)
-	size_change_rate = np.tan(half_angle / zoom_scale) / np.tan(half_angle)
-	#print(size_change_rate)
-	zoomed_size = int(args.window_size * size_change_rate)
-	p1 = pv.Plotter(off_screen = True, window_size = (zoomed_size, zoomed_size))
-	p1.add_mesh(surface)
-
-	def centre_crop(orig_dep):
-		centre_x, centre_y, half_size = orig_dep.shape[0] // 2, orig_dep.shape[1] // 2, args.window_size // 2
-		rot_dep = orig_dep[centre_x - half_size : centre_x + half_size, centre_y - half_size : centre_y + half_size, ...]
-		return rot_dep
-
-	def get_rotation_plain(position, orientation, up, degree):
-		return get_depth_map(p, camera_params["focal_length"], position, orientation, rotate_single_vector(up, orientation, 360 - degree))
-
-	def get_rotation_new(orig_dep, degree):
-		return centre_crop(ndimage.rotate(orig_dep, degree, reshape = False))
-
-	"""
-	orig_dep = get_depth_map(p1, camera_params["focal_length"], new_position, new_orientation, new_up, zoom = zoom_scale)
-	for degree in range(0, 360, 10):
-		p_dep = get_rotation_plain(new_position, new_orientation, new_up, degree)
-		n_dep = get_rotation_new(orig_dep, degree)
-		print(np.mean((p_dep - n_dep) ** 2))
-	"""
-
-	rgb, virtual_depth_map = get_depth_map(p, camera_params["focal_length"], new_position, new_orientation, new_up, get_outputs = True)
-	err1 = plot_it(rgb, virtual_depth_map)
-	rgb, virtual_depth_map = get_depth_map(p, camera_params["focal_length"], t_position, t_orientation, up_vector_base, get_outputs = True)
-	err2 = plot_it(rgb, virtual_depth_map)
-	plt.subplot(1, 2, 1)
-	plt.hist(err1.flatten())
-	plt.title("New pose error")
-	plt.subplot(1, 2, 2)
-	plt.hist(err2.flatten())
-	plt.title("Old pose error")
-	plt.show()
-
-	exit()
-
-
-	this_corr = comb_corr_sim(real_depth_map, virtual_depth_map)
-
-
-	return
-
-	for i, (t_focal, t_position, t_orientation, __) in enumerate(tqdm(all_sampled_params)):
-		#p1.add_mesh(pv.Arrow(t_position, t_orientation), color = "red")
-		rgb, virtual_depth_map = get_depth_map(p, camera_params["focal_length"], t_position, t_orientation, up_vector_base, get_outputs = True)
-		for j in range(4):
-			if j > 0:
-				virtual_depth_map = np.rot90(virtual_depth_map)
-				if virtual_depth_map.max() > 200:
-					continue
-				rgb = np.stack([np.rot90(rgb[..., i]) for i in range(rgb.shape[-1])], axis = -1)
-			this_corr = comb_corr_sim(real_depth_map, virtual_depth_map)
-			#cv2.imwrite(os.path.join(output_path, f"{frame_idx:06d}-{this_corr:.4f}.png"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
-			if this_corr > 0.6:
-				plt.clf()
-				plt.subplot(2, 2, 1)
-				plt.imshow(real_depth_map, cmap = "gray")
-				plt.subplot(2, 2, 2)
-				plt.imshow(virtual_depth_map, cmap = "gray")
-				plt.subplot(2, 2, 3)
-				plt.imshow(rgb)
-				plt.subplot(2, 2, 4)
-				plt.scatter(real_depth_map.flatten(), virtual_depth_map.flatten())
-				plt.savefig(os.path.join(output_path, f"{frame_idx:06d}-{this_corr:.4f}.png"))
-			
-	#p1.show()
-
-def fix_camera_pose(frame_idx, em_path, em_depth_path, output_path, args):
-	surface = pv.read(args.mesh_path)
-	zoom_scale = 2 ** -0.5
-	half_angle = np.deg2rad(camera_params["view_angle"] / 2)
-	size_change_rate = np.tan(half_angle / zoom_scale) / np.tan(half_angle)
-	zoomed_size = int(args.window_size * size_change_rate)
-	p1 = pv.Plotter(off_screen = True, window_size = (zoomed_size, zoomed_size))
-	p1.add_mesh(surface)
-
-	p = pv.Plotter(off_screen = True, window_size = (args.window_size, args.window_size))
-	p.add_mesh(surface)
 	
-	real_depth_map = np.load(os.path.join(em_depth_path, f"{frame_idx:06d}.npy"))
-
-	num_samples = 50
-	angle_step_size = 20
-	t_position = np.array([-33.79384209, -28.94875791, -160.28407521])
-	t_orientation = np.array([-0.89581517, 0.32385322, -0.30435879])
-	up_vector_base = np.array([0.43895517, 0.53761082, -0.71992567])
-
-	"""
-	t_up = rotate_single_vector(up_vector_base, t_orientation, 270)
-	t_left = np.cross(t_up, t_orientation)
-	t_left = t_left / np.linalg.norm(t_left)
-	"""
-
-
-	axial_scale = 0.5
-	radial_scale = 7
-	orientation_scale = 0.4
-	
-	
-	all_sampled_params = randomise_params(camera_params["focal_length"],
-		axial_scale, radial_scale, t_position, orientation_scale, t_orientation,
-		num_samples)
 	#best_corr_params = get_fixed_corr(real_depth_map, p, camera_params["focal_length"], t_position, t_orientation, up_vector_base)
-	"""
-
 
 	#plt.figure(figsize = (20, 15))
 
+	"""
 	left_offset = -2
 	up_offset = 3
-	axial_offset = 7
+	axial_offset = 4
 	up_rotate = -7
-	ori_left_offset = -0.3
-	ori_up_offset = 0.5
+	ori_left_offset = 0
+	ori_up_offset = 0.3
 	new_position = t_position + left_offset * t_left + up_offset * t_up + axial_offset * t_orientation
 	new_up = rotate_single_vector(t_up, t_orientation, up_rotate)
 	new_orientation = t_orientation + t_up * ori_up_offset + t_left * ori_left_offset
+	"""
+
+	"""
+	new_rgb, new_dep = get_depth_map(p, camera_params["focal_length"], new_position, new_orientation, new_up, get_outputs = True)
+	plt.subplot(2, 2, 1)
+	plt.imshow(new_dep)
+	plt.subplot(2, 2, 2)
+	plt.imshow(new_rgb)
+	plt.subplot(2, 2, 3)
+	plt.imshow(real_depth_map)
+	plt.subplot(2, 2, 4)
+	plt.imshow(real_rgb)
+	plt.show()
+	"""
 
 	from sklearn.linear_model import LinearRegression as LR
+	from pose_fixing.similarity import dark_threshold_r, dark_threshold_v, dark_weight, light_weight
 
-	def plot_it(rgb, virtual_depth_map, capping_value = 40):
-		rd1, vd1 = real_depth_map.reshape(-1, 1), virtual_depth_map.reshape(-1, 1)
-		vd1 = np.minimum(vd1, capping_value)
-		w = np.ones(rd1.shape[0])
-		w[rd1.flatten() < 3] = 0.3
-		reg = LR().fit(rd1, vd1, w)
-		score = reg.score(rd1, vd1, w)
-		err = (vd1 - reg.predict(rd1)) ** 2
+	light_additional_weight = 1.2
+
+	def weighted_mean(x, w):
+		#print(x.shape, w.shape)
+		return (x * w).sum() / w.sum()
+
+	def weighted_cov(x, y, w):
+		return (w * (x - weighted_mean(x, w)) * (y - weighted_mean(y, w))).sum() / w.sum()
+
+	def get_threshold(x, bins = 20, rate = 0.1):
+		#return np.median(x.flatten()) * 2 - x.min()
+		h, bin_edges = np.histogram(x.flatten(), bins = bins, density = True)
+		first_outlier_idx = len(h) - np.argmax(np.flip((h > np.max(h) * rate).astype(np.int)))
+		return bin_edges[first_outlier_idx]
+
+	def get_old_weights(rd1, vd1):
+		r_thres = get_threshold(rd1)
+		v_thres = get_threshold(vd1)
+		dark_mask = np.logical_and(rd1 < r_thres, vd1 < v_thres)
+		w = np.ones_like(rd1) * light_weight
+		w[dark_mask] = dark_weight
+		return w
+
+	def get_new_weights(rd1, vd1):
+		r_thres = get_threshold(rd1)
+		v_thres = get_threshold(vd1)
+		dark_mask = np.logical_and(rd1 < r_thres, vd1 < v_thres)
+		dark_count = np.sum(dark_mask)
+		light_count = len(rd1) - dark_count
+		w = np.ones_like(rd1) * light_additional_weight * dark_count / (dark_count + light_count)
+		w[dark_mask] = light_count / (dark_count + light_count)
+		return w
+
+	def plot_it(rgb, virtual_depth_map, error_mode = "corr", weights = "new", mean_method = "weighted"):
+		rd1, vd1 = real_depth_map.flatten(), virtual_depth_map.flatten()
+		w = get_old_weights(rd1, vd1) if weights == "old" else get_new_weights(rd1, vd1)
+		if mean_method == "weighted":
+			err = ((rd1 - weighted_mean(rd1, w)) * (vd1 - weighted_mean(vd1, w))) / (weighted_cov(rd1, rd1, w) * weighted_cov(vd1, vd1, w)) ** 0.5
+		else:
+			err = ((rd1 - np.mean(rd1)) * (vd1 - np.mean(vd1))) / (np.var(rd1) * np.var(vd1))
+		corr = np.sum(err * w) / np.sum(w)
 		err = err.reshape(*virtual_depth_map.shape)
-		plt.clf()
-		plt.subplot(2, 2, 1)
-		plt.imshow(real_depth_map, cmap = "gray")
-		plt.subplot(2, 2, 2)
-		plt.imshow(virtual_depth_map, cmap = "gray")
-		plt.subplot(2, 2, 3)
-		#plt.imshow(rgb)
-		plt.imshow(err)
-		plt.colorbar()
-		plt.subplot(2, 2, 4)
-		plt.scatter(real_depth_map.flatten(), virtual_depth_map.flatten())
-		#plt.savefig(os.path.join(output_path, f"res_{left_offset}_{up_offset}_{this_corr}.png"))
-		plt.suptitle(f"{score:.6f}")
+		w = w.reshape(*virtual_depth_map.shape)
+
+		return err, w, corr
+
+	def analysis_corr(rd1, vd1):
+		prev_shape = rd1.shape
+		rd1, vd1 = rd1.flatten(), vd1.flatten()
+		r_thres = get_threshold(rd1)
+		q = np.sum(rd1 < r_thres) / len(rd1)
+		#v_thres = get_threshold(vd1)
+		v_thres = np.quantile(vd1, q)
+		dark_mask = np.logical_and(rd1 < r_thres, vd1 < v_thres)
+		w = np.ones_like(rd1) * light_weight
+		w[dark_mask] = dark_weight
+		err = ((rd1 - weighted_mean(rd1, w)) * (vd1 - weighted_mean(vd1, w))) / (weighted_cov(rd1, rd1, w) * weighted_cov(vd1, vd1, w)) ** 0.5
+		print(f"Dark count rate {(np.sum(dark_mask) / len(rd1)):.4f}. Dark weight rate {(np.sum(w[dark_mask]) / np.sum(w)):.4f}.")
+		print(f"Dark cov unweighted contribute: {np.mean(err[dark_mask]):.4f}.")
+		print(f"Light count rate {(1 - np.sum(dark_mask) / len(rd1)):.4f}. Light weight rate {(np.sum(w[np.logical_not(dark_mask)]) / np.sum(w)):.4f}")
+		print(f"Light cov unweighted contribute: {np.mean(err[np.logical_not(dark_mask)]):.4f}.")
+		light_mask = np.logical_and
+		print(f"IoU: {np.sum(np.logical_and(rd1 > r_thres, vd1 > v_thres)) / np.sum(np.logical_or(rd1 > r_thres, vd1 > v_thres)):.4f}")
+		print(f"Quantile: {q:.4f}. Correlation: {(np.sum(err * w) / np.sum(w)):.4f}.")
+		#print(f"Unweighted Correlation: {}")
+
+		light_mask_r = (rd1 > r_thres).astype(np.uint8)
+		light_mask_v = (vd1 > v_thres).astype(np.uint8)
+		light_contours_r, __ = cv2.findContours(light_mask_r.reshape(*prev_shape), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+		light_contours_v, __ = cv2.findContours(light_mask_v.reshape(*prev_shape), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+		"""
+		print(light_contours_r.shape, light_contours_v.shape)
+		print(len(light_contours_r), len(light_contours_v))
+
+		contours_img_r = cv2.drawContours(cv2.cvtColor(light_mask_r.reshape(*prev_shape), cv2.COLOR_GRAY2BGR), light_contours_r, -1, (0, 255, 0), 3)
+		contours_img_v = cv2.drawContours(cv2.cvtColor(light_mask_v.reshape(*prev_shape), cv2.COLOR_GRAY2BGR), light_contours_v, -1, (0, 255, 0), 3)
+
+		plt.subplot(1, 2, 1)
+		plt.imshow(contours_img_r)
+		plt.title("Real")
+		plt.subplot(1, 2, 2)
+		plt.imshow(contours_img_v)
+		plt.title("Virtual")
 		plt.show()
-		return err
+		"""
+
+		light_contours_v = np.concatenate(light_contours_v, axis = 0).reshape(-1, 2)
+		light_contours_r = np.concatenate(light_contours_r, axis = 0).reshape(-1, 2)
+		print(light_contours_r.shape, light_contours_v.shape)
+		hausdorff_dist = max(DHD(light_contours_r, light_contours_v)[0], DHD(light_contours_v, light_contours_r)[0])
+		print(f"Hausdorff distance: {hausdorff_dist:.4f}.")
+
+		iou = np.zeros_like(rd1)
+		iou[np.logical_and(rd1 > r_thres, vd1 > v_thres)] = 1
+		iou[np.logical_and(rd1 > r_thres, vd1 <= v_thres)] = 2
+		iou[np.logical_and(rd1 <= r_thres, vd1 > v_thres)] = 3
+		return iou.reshape(*prev_shape)
+
+		#print(f"Confirmed corr {(np.sum(err * w) / np.sum(w)):.4f}")
+
+	def log_error(x1, x2):
+		alp = np.mean(np.log(x1) - np.log(x2))
+		dist = np.mean((np.log(x2) - np.log(x1) + alp) ** 2) / 2
+		return dist
+
+	old_rgb, old_dep = get_depth_map(p, old_position, old_orientation, old_up, get_outputs = True)
+	err_old, mask_old, corr_old = plot_it(old_rgb, old_dep)
+	#err_old, mask_old, corr_old = plot_it(old_rgb, old_dep, mean_method = "simple")
+	new_rgb, new_dep = get_depth_map(p, new_position, new_orientation, new_up, get_outputs = True)
+	err_new, mask_new, corr_new = plot_it(new_rgb, new_dep)
+	#err_new, mask_new, corr_new = plot_it(new_rgb, new_dep, mean_method = "simple")
+
+	plt.imshow(new_dep, cmap = "gray")
+	plt.show()
+	exit()
+
+
+
+	print("Old sim (corr, log): ", comb_corr_sim(real_depth_map, old_dep), log_error(real_depth_map, old_dep))
+	old_iou = analysis_corr(real_depth_map, old_dep)
+	print("New sim (corr, log): ", comb_corr_sim(real_depth_map, new_dep), log_error(real_depth_map, new_dep))
+	new_iou = analysis_corr(real_depth_map, new_dep)
+
+	"""
+	for fl in [20, 50, 100, 200, 300]:
+		tmp_dep = get_depth_map(p, new_position, new_orientation, new_up, focal_length = fl)
+		print(np.mean((tmp_dep - new_dep) ** 2))
+	
+	exit()
 	"""
 
-	from scipy import ndimage
-
-
-
-	def centre_crop(orig_dep):
-		centre_x, centre_y, half_size = orig_dep.shape[0] // 2, orig_dep.shape[1] // 2, args.window_size // 2
-		rot_dep = orig_dep[centre_x - half_size : centre_x + half_size, centre_y - half_size : centre_y + half_size, ...]
-		return rot_dep
-
-	def get_rotation_plain(position, orientation, up, degree):
-		return get_depth_map(p, camera_params["focal_length"], position, orientation, rotate_single_vector(up, orientation, 360 - degree))
-
-	def get_rotation_new(orig_dep, degree):
-		return centre_crop(ndimage.rotate(orig_dep, degree, reshape = False))
-
 	"""
-	orig_dep = get_depth_map(p1, camera_params["focal_length"], new_position, new_orientation, new_up, zoom = zoom_scale)
-	for degree in range(0, 360, 10):
-		p_dep = get_rotation_plain(new_position, new_orientation, new_up, degree)
-		n_dep = get_rotation_new(orig_dep, degree)
-		print(np.mean((p_dep - n_dep) ** 2))
+	bins = 20
+	rate = 0.1
+
+	plt.subplot(1, 3, 1)
+	plt.hist(old_dep.flatten(), bins = bins, density = True)
+	plt.title(f"Old depth histogram, threshold: {get_threshold(old_dep, bins, rate):.2f}")
+
+	plt.subplot(1, 3, 2)
+	plt.hist(new_dep.flatten(), bins = bins, density = True)
+	plt.title(f"New depth histogram, threshold: {get_threshold(new_dep, bins, rate):.2f}")
+	plt.subplot(1, 3, 3)
+	plt.hist(real_depth_map.flatten(), bins = bins, density = True)
+	plt.title(f"Real depth histogram, threshold: {get_threshold(real_depth_map, bins, rate):.2f}")
+	plt.show()
+	exit()
 	"""
 
-	"""
-	rgb, virtual_depth_map = get_depth_map(p, camera_params["focal_length"], new_position, new_orientation, new_up, get_outputs = True)
-	err1 = plot_it(rgb, virtual_depth_map)
-	rgb, virtual_depth_map = get_depth_map(p, camera_params["focal_length"], t_position, t_orientation, up_vector_base, get_outputs = True)
-	err2 = plot_it(rgb, virtual_depth_map)
-	plt.subplot(1, 2, 1)
-	plt.hist(err1.flatten())
-	plt.title("New pose error")
-	plt.subplot(1, 2, 2)
-	plt.hist(err2.flatten())
-	plt.title("Old pose error")
+	plt.subplot(2, 3, 1)
+	#plt.imshow(err_old, vmin = -0.5, vmax = 5)
+	plt.imshow(err_old, cmap = "gray", vmin = 0, vmax = 5)
+	plt.colorbar()
+	plt.title(f"Old pose corr: {comb_corr_sim(real_depth_map, old_dep):.4f}")
+	#plt.hist(err1.flatten())
+	plt.subplot(2, 3, 2)
+	plt.imshow(old_dep, cmap = "gray")
+	plt.colorbar()
+	plt.title(f"Old weighted mean: {weighted_mean(old_dep, mask_old):.4f}.")
+	plt.subplot(2, 3, 3)
+	#plt.imshow(mask_old)
+	plt.imshow(old_iou)
+	plt.colorbar()
+	plt.subplot(2, 3, 4)
+	#plt.hist(err2.flatten())
+	#plt.imshow(err2, vmin = -0.5, vmax = 5)
+	plt.imshow(err_new, cmap = "gray", vmin = 0, vmax = 5)
+	plt.colorbar()
+	plt.title(f"New pose corr: {comb_corr_sim(real_depth_map, new_dep):.4f}")
+	#plt.imshow(old_dep, cmap = "gray", vmin = 0, vmax = 40)
+	plt.subplot(2, 3, 5)
+	#plt.imshow(new_dep, cmap = "gray", vmin = 0, vmax = 40)
+	plt.imshow(new_dep, cmap = "gray")
+	plt.colorbar()
+	plt.title(f"New weighted mean: {weighted_mean(new_dep, mask_new):.4f}.")
+	plt.subplot(2, 3, 6)
+	#plt.imshow(mask_new)
+	plt.imshow(new_iou)
+	plt.colorbar()
 	plt.show()
 
 	exit()
-	"""
-
-
-	#this_corr = comb_corr_sim(real_depth_map, virtual_depth_map)
 
 	"""
-	n_trys = 50
 
-	st_time = time.time()
-	for i in range(n_trys):
-		orig_dep = get_depth_map(p1, camera_params["focal_length"], t_position, t_orientation, up_vector_base)
-	print("Renderring time: ", (time.time() - st_time) / n_trys)
-
-	orig_dep = get_depth_map(p1, camera_params["focal_length"], t_position, t_orientation, up_vector_base, zoom = zoom_scale)
-	st_time = time.time()
-	for i in range(n_trys):
-		cur_dep = get_rotation_new(orig_dep, 35)
-	print("Rotation time: ", (time.time() - st_time) / n_trys)
-
-	st_time = time.time()
-	for i in range(n_trys):
-		this_corr = comb_corr_sim(real_depth_map, cur_dep)
-	print("Similarity time: ", (time.time() - st_time) / n_trys)
-
-	exit()
+	for i, (t_focal, t_position, t_orientation, t_up) in enumerate(tqdm(all_sampled_params)):
+		#p1.add_mesh(pv.Arrow(t_position, t_orientation), color = "red")
+		#print(get_vector_angle(t_up, desired_up))
+		if get_vector_angle(t_up, desired_up) > 30:
+			continue
+		virtual_depth_map = get_depth_map(p, camera_params["focal_length"], t_position, t_orientation, t_up)
+		if np.any(np.isnan(virtual_depth_map)):
+			continue
+		this_corr = comb_corr_sim(real_depth_map, virtual_depth_map)
+		#cv2.imwrite(os.path.join(output_path, f"{frame_idx:06d}-{this_corr:.4f}.png"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+		if this_corr > 0.85:
+			plt.clf()
+			plt.subplot(2, 2, 1)
+			plt.imshow(real_depth_map, cmap = "gray")
+			plt.subplot(2, 2, 2)
+			plt.imshow(virtual_depth_map, cmap = "gray")
+			plt.subplot(2, 2, 3)
+			rgb, __ = get_depth_map(p, camera_params["focal_length"], t_position, t_orientation, t_up, get_outputs = True)
+			plt.imshow(rgb)
+			plt.subplot(2, 2, 4)
+			plt.scatter(real_depth_map.flatten(), virtual_depth_map.flatten())
+			plt.savefig(os.path.join(output_path, f"{frame_idx:06d}-{this_corr:.4f}.png"))
+			with open(os.path.join(output_path, f"{frame_idx:06d}-{this_corr:.4f}.txt"), "w") as f:
+				out = f"{t_position}\n{t_orientation}\n{t_up}\n"
+				f.write(out)
 	"""
-
-
-	st_time = time.time()
-	for i, (t_focal, t_position, t_orientation, t_up) in enumerate(all_sampled_params):
-		orig_dep = get_depth_map(p1, camera_params["focal_length"], t_position, t_orientation, t_up, zoom = zoom_scale)
-		for degree in range(0, 360, angle_step_size):
-			#cur_rgb, cur_dep = get_rotation_new(orig_rgb, degree), get_rotation_new(orig_dep, degree)
-			if args.uses_new_rotation:
-				cur_dep = get_rotation_new(orig_dep, degree)
-			else:
-				cur_dep = get_depth_map(p, camera_params["focal_length"], t_position, t_orientation, t_up)
-			this_corr = comb_corr_sim(real_depth_map, cur_dep)
-			"""
-			if this_corr > 0.7:
-				plt.clf()
-				plt.subplot(2, 2, 1)
-				plt.imshow(real_depth_map, cmap = "gray")
-				plt.subplot(2, 2, 2)
-				plt.imshow(cur_dep, cmap = "gray")
-				plt.subplot(2, 2, 3)
-				plt.imshow(get_rotation_new(orig_rgb, degree))
-				plt.subplot(2, 2, 4)
-				plt.scatter(real_depth_map.flatten(), cur_dep.flatten())
-				plt.savefig(os.path.join(output_path, f"{frame_idx:06d}-{this_corr:.4f}.png"))
-			"""
-	
-	print("Average time: ", (time.time() - st_time) / (len(all_sampled_params) * (360 // angle_step_size)))
-	#p1.show()
-
 
 def main():
 	args = get_args()
@@ -466,12 +471,12 @@ def main():
 	rgb_img, __ = get_depth_map(p, focal_length, translation, orientation, up_direction, get_outputs = True)
 	plt.imshow(rgb_img)
 	plt.show()
-	"""
 
 	for frame_idx in range(20):
-		fix_camera_pose(frame_idx, em_path, em_depth_path, output_path, args)
+		check_rotation(frame_idx, em_path, em_depth_path, output_path, args)
+	"""
 
-	#fix_single_frame(0, em_path, em_depth_path, output_path, args)
+	check_rotation(1416, em_path, em_depth_path, output_path, args)
 
 if __name__ == '__main__':
 	main()

@@ -163,3 +163,4 @@ t1.txt
 emcoords.csv
 rename_files.py
 *_vis
+*.csv
