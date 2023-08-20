@@ -41,7 +41,7 @@ def mi_sim(img1, img2, num_bins = 20):
 
 def get_dark_threshold(x, bins = 20, rate = 0.1):
 	h, bin_edges = np.histogram(x.ravel(), bins = bins, density = True)
-	first_outlier_idx = len(h) - np.argmax(np.flip((h > np.max(h) * rate).astype(np.int)))
+	first_outlier_idx = len(h) - np.argmax(np.flip((h > np.max(h) * rate).astype(int)))
 	return bin_edges[first_outlier_idx]
 
 def comb_corr_sim(img1, img2, light_weight = light_weight, dark_weight = dark_weight):
