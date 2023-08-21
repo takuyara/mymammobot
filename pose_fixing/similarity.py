@@ -1,5 +1,4 @@
 import cv2
-import torch
 import numpy as np
 from sklearn.linear_model import LinearRegression as LR
 from scipy.spatial.distance import directed_hausdorff as DHD

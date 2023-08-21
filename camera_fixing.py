@@ -4,6 +4,7 @@ import cv2
 import time
 import argparse
 import numpy as np
+import pyvista as pv
 from multiprocessing import Pool
 from scipy.spatial.transform import Rotation as R
 
@@ -47,6 +48,8 @@ def get_args():
 
 	parser.add_argument("--light-mask-scales", type = int, nargs = "+", default = [0.1, 0.25, 0.4])
 
+	parser.add_argument("--no-gpu", action = "store_true", default = False)
+
 	return parser.parse_args()
 
 def fix_single_image(args, img_idx, output_path):
@@ -80,6 +83,9 @@ def fix_single_image(args, img_idx, output_path):
 
 def main():
 	args = get_args()
+
+	if args.no_gpu:
+		pv.start_xvfb()
 	
 	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
 	output_path = os.path.join(args.em_base_path, f"EM-newfix-{args.em_idx}-{args.try_idx}")

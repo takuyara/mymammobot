@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.stats as st
 import warnings
-import torch
 from scipy.stats._continuous_distns import _distn_names
 
 def get_num_bins(x):
