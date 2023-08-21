@@ -9,8 +9,8 @@ import shutil
 import sys
 
 from utils.stats import get_num_bins
-from domain_transfer.similarity import kl_sim, corr_sim, mi_sim, comb_corr_sim, dark_threshold_v, dark_threshold_r
-from domain_transfer.alignment import reg_depth_maps
+from pose_fixing.similarity import kl_sim, corr_sim, mi_sim, comb_corr_sim, dark_threshold_v, dark_threshold_r, cache_base_data, contour_sim, draw_contours
+#from domain_transfer.alignment import reg_depth_maps
 
 em_base_path = "./depth-images/"
 show_n_samples = 100
@@ -361,6 +361,49 @@ def plot_corr_mega():
 			plt.show()
 			plt.clf()
 
+def plot_one_fix_contour(em_idx, img_idx, try_idx):
+	plt.clf()
+	rd = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+	#vd = np.load(os.path.join(em_base_path, f"EM-virtual-{em_idx}", f"{img_idx:06d}.npy"))
+	fd = np.load(os.path.join(em_base_path, f"EM-newfix-{em_idx}-{try_idx}", f"{img_idx:06d}.npy"))
+	r_rgb = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"))
+	#v_rgb = cv2.imread(os.path.join(em_base_path, f"EM-virtual-{em_idx}", f"{img_idx:06d}.png"))
+	f_rgb = cv2.imread(os.path.join(em_base_path, f"EM-newfix-{em_idx}-{try_idx}", f"{img_idx:06d}.png"))
+
+	base_contours, quantile = cache_base_data(rd)
+	cont_sim = contour_sim(fd, base_contours, quantile)
+	r_contour_img = draw_contours(rd, base_contours, quantile)
+	f_contour_img = draw_contours(fd, base_contours, quantile)
+	corr_sim = comb_corr_sim(rd, fd)
+
+	#corr_vd, corr_fd = comb_corr_sim(rd, vd), comb_corr_sim(rd, fd)
+	plt.subplot(2, 2, 1)
+	plt.imshow(r_rgb)
+	plt.title("Real RGB Frame")
+	plt.subplot(2, 2, 2)
+	plt.imshow(f_rgb)
+	plt.title("Fixed RGB Frame")
+	plt.subplot(2, 2, 3)
+	plt.imshow(r_contour_img)
+	plt.title("Real Depth Map")
+	plt.subplot(2, 2, 4)
+	plt.imshow(f_contour_img)
+	plt.title(f"Fixed Depth Map")
+
+	plt.suptitle(f"EM-{em_idx}-{img_idx} {cont_sim:.0f}, {corr_sim:.4f}")
+
+def draw_contour_outputs(em_idx, try_idx):
+	fix_path = os.path.join(em_base_path, f"EM-newfix-{em_idx}-{try_idx}")
+	eval_path = os.path.join(em_base_path, f"EM-newfix-eval-{em_idx}-{try_idx}")
+	os.makedirs(eval_path, exist_ok = True)
+	for fixed_map_path in os.listdir(fix_path):
+		if not fixed_map_path.endswith(".npy"):
+			continue
+		img_idx = int(fixed_map_path.replace(".npy", ""))
+		plot_one_fix_contour(em_idx, img_idx, try_idx)
+		plt.savefig(os.path.join(eval_path, f"{img_idx:06d}.png"))
+		plt.clf()
+
 if __name__ == '__main__':
 	plt.figure(figsize = (20, 15))
 	#write_sim_list()
@@ -370,10 +413,14 @@ if __name__ == '__main__':
 	#find_correspond_tryidx()
 	#plot_fix_maxfit([0, 1, 2])
 	#select_between_candidates(2, [2, 3, 4, 8, 9], 100)
-	plot_max_depth()
+	#plot_max_depth()
 	"""
 	if sys.argv[1] == "eval":
 		plot_bf_fix(ing(sys.argv[2]), int(sys.argv[3]))
 	if sys.argv[1] == "select":
 		manually_select_alignment(int(sys.argv[2]), int(sys.argv[3]))
 	"""
+	draw_contour_outputs(0, 0)
+	draw_contour_outputs(1, 0)
+	draw_contour_outputs(2, 0)
+	

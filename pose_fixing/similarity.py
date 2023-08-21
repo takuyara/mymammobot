@@ -39,18 +39,25 @@ def mi_sim(img1, img2, num_bins = 20):
 	mi = np.sum(pxy[indices] * np.log(pxy[indices] / px_py[indices]))
 	return mi
 
-def get_dark_threshold(x, bins = 20, rate = 0.1):
+def get_dark_threshold(x, bins = 30, rate = 0.25):
 	h, bin_edges = np.histogram(x.ravel(), bins = bins, density = True)
 	first_outlier_idx = len(h) - np.argmax(np.flip((h > np.max(h) * rate).astype(int)))
 	return bin_edges[first_outlier_idx]
 
-def comb_corr_sim(img1, img2, light_weight = light_weight, dark_weight = dark_weight):
+def comb_corr_sim(img1, img2, light_mask_1 = None, light_mask_2 = None, light_weight = light_weight, dark_weight = dark_weight):
 	# img1: SFS, img2: Mesh
 	img1, img2 = img1.ravel(), img2.ravel()
-	dark_thres_1 = get_dark_threshold(img1)
-	dark_thres_2 = get_dark_threshold(img2)
-	weights = np.ones_like(img1) * light_weight
-	weights[np.logical_and(img1 < dark_thres_1, img2 < dark_thres_2)] = dark_weight
+	if light_mask_1 is None:
+		light_mask_1 = get_light_mask(img1)
+	else:
+		light_mask_1 = light_mask_1.ravel()
+	if light_mask_2 is None:
+		light_mask_2 = get_light_mask(img2)
+	else:
+		light_mask_2 = light_mask_2.ravel()
+
+	weights = np.ones_like(img1) * dark_weight
+	weights[np.logical_or(light_mask_1, light_mask_2)] = light_weight
 	return weighted_corr(img1, img2, weights)
 
 def unweighted_corr_sim(img1, img2):
@@ -94,19 +101,32 @@ def cache_base_data(img):
 	light_mask = get_light_mask(img)
 	quantile = 1 - np.sum(light_mask) / len(img.ravel())
 	contours = get_contours(light_mask)
-	return contours, quantile
+	return contours, quantile, light_mask
 
-def contour_sim(img, base_contours, quantile):
-	light_mask = get_light_mask(img, quantile = quantile)
+def contour_sim(img, base_contours, quantile, light_mask = None):
+	if light_mask is None:
+		light_mask = get_light_mask(img, quantile = quantile)
 	contours = get_contours(light_mask)
+
 	if contours is None:
 		return None
 	hausdorff_dist = max(DHD(contours, base_contours)[0], DHD(base_contours, contours)[0])
 	return -hausdorff_dist
 
-def draw_contours(img, base_contours, quantile):
+def draw_contours(img, quantile):
 	light_mask = get_light_mask(img, quantile = quantile)
-	return light_mask
 	contours, __ = cv2.findContours(light_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-	contours_img = cv2.drawContours(cv2.cvtColor(img, cv2.COLOR_GRAY2BGR), contours, -1, (0, 255, 0), 3)
+	img_normed = (img - img.min()) / (img.max() - img.min())
+	img_normed = img_normed.reshape(*img_normed.shape, 1).astype(np.float32)
+	#print(img_normed, img_normed.shape)
+	rgb_img = cv2.cvtColor(img_normed, cv2.COLOR_GRAY2BGR)
+	contours_img = cv2.drawContours(rgb_img, contours, -1, (0, 255, 0), 3)
 	return contours_img
+
+def contour_corr_sim(img, base_img, base_contours, quantile, base_light_mask):
+	light_mask = get_light_mask(img, quantile = quantile)
+	cont_sim = contour_sim(img, base_contours, quantile, light_mask)
+	corr_sim = comb_corr_sim(base_img, img, base_light_mask, light_mask)
+	if cont_sim is None or corr_sim is None:
+		return None
+	return cont_sim, corr_sim

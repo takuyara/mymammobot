@@ -10,7 +10,6 @@ from scipy.spatial.transform import Rotation as R
 from pose_fixing.evo_strat import EvolutionStrategy
 from utils.cl_utils import load_all_cls, project_to_cl, get_cl_direction
 from ds_gen.camera_features import camera_params
-#from utils.geometry import rotate_single_vector, arbitrary_perpendicular_vector, get_vector_angle
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -57,27 +56,13 @@ def fix_single_image(args, img_idx, output_path):
 
 	base_position, quaternion = old_pose[ : 3], old_pose[3 : ]
 	base_position, cl_indices = project_to_cl(base_position, all_cls, return_cl_indices = True)
-	base_orientation = R.from_quat(quaternion).apply(camera_params["forward_direction"])
-	base_orientation = base_orientation / np.linalg.norm(base_orientation)
 	cl_orientation = get_cl_direction(all_cls, cl_indices)
 	lumen_radius = all_cls[cl_indices[0]][1][cl_indices[1]]
 
-	"""
-	base_up = R.from_quat(quaternion).apply(camera_params["up_direction"])
-	base_up = base_up / np.linalg.norm(base_up)
-	arbit_up = arbitrary_perpendicular_vector(base_orientation)
-	base_up_rot = get_vector_angle(arbit_up, base_up)
-	angle_pos = get_vector_angle(rotate_single_vector(arbit_up, base_orientation, base_up_rot), base_up)
-	angle_neg = get_vector_angle(rotate_single_vector(arbit_up, base_orientation, -base_up_rot), base_up)
-	if angle_neg < angle_pos:
-		base_up_rot = -base_up_rot
-	"""
-	
 	es = EvolutionStrategy(args.mesh_path, args.img_size, real_depth_map, args.num_parents, args.num_offsprings,
 		args.num_generations, args.axial_scale, lumen_radius * args.radial_scale_rate, args.orientation_scale, args.rot_scale,
 		learning_rate = args.es_learning_rate, contour_tolerance = args.contour_tolerance, to_norm_scale = args.to_norm_scale)
 
-	#es.show_sigma_samples()
 	es.init_population(base_position, cl_orientation, args.norm_samples, args.rot_samples, args.up_rot_samples)
 	global_optim, rgb_img, dep_img = es.run()
 

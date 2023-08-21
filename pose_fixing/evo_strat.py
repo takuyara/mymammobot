@@ -4,7 +4,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from functools import cmp_to_key
 
-from pose_fixing.similarity import comb_corr_sim, reg_mse_sim, cache_base_data, contour_sim, draw_contours
+from pose_fixing.similarity import cache_base_data, contour_corr_sim
 from pose_fixing.move_camera import random_move, uniform_sampling, move_by_params, reverse_to_geno
 from ds_gen.depth_map_generation import get_depth_map
 
@@ -19,9 +19,6 @@ class EvolutionStrategy:
 		surface = pv.read(mesh_path)
 		self.plotter = pv.Plotter(off_screen = True, window_size = (img_size, img_size))
 		self.plotter.add_mesh(surface)
-
-		self.plotter_debug = pv.Plotter()
-		self.plotter_debug.add_mesh(surface, opacity = 0.5)
 
 		self.real_depth_map = real_depth_map
 		self.learning_rate = learning_rate
@@ -62,12 +59,8 @@ class EvolutionStrategy:
 		assert fitness_func == "contour_corr" and parent_selection == "best"
 
 	def fitness_func(self, img):
-		c1, c2 = contour_sim(img, *self.contour_cache), comb_corr_sim(self.real_depth_map, img)
-		if c1 is None or c2 is None:
-			return None
-		else:
-			return c1, c2
-
+		return contour_corr_sim(img, self.real_depth_map, *self.contour_cache)
+		
 	def get_fitness_compare(self):
 		def compare(pheno_1, pheno_2):
 			fitness_1, fitness_2 = pheno_1[1][-1], pheno_2[1][-1]
@@ -87,31 +80,9 @@ class EvolutionStrategy:
 		# Sigma not passed to move cameras.
 		position, orientation, up = move_by_params(self.base_position, self.base_orientation, *geno[ : -1])
 		virtual_depth_map = get_depth_map(self.plotter, position, orientation, up)
-		"""
-		plt.subplot(1, 2, 1)
-		plt.imshow(virtual_depth_map, cmap = "gray")
-		plt.subplot(1, 2, 2)
-		plt.imshow(draw_contours(virtual_depth_map, *self.contour_cache))
-		plt.show()
-		"""
 		if np.any(np.isnan(virtual_depth_map)):
 			return None
 		fitness = self.fitness_func(virtual_depth_map)
-		"""
-		if fitness[0] < -1e5:
-			plt.subplot(1, 2, 1)
-			plt.imshow(virtual_depth_map, cmap = "gray")
-			plt.subplot(1, 2, 2)
-			plt.imshow(draw_contours(virtual_depth_map, *self.contour_cache))
-			plt.show()
-			print(f"Quantile: {self.contour_cache[1]}. Value: {np.quantile(virtual_depth_map.ravel(), self.contour_cache[1])}")
-		try:
-			pass
-		except ValueError as e:
-			return None
-		"""
-
-		#assert abs(fitness - comb_corr_sim(self.real_depth_map, virtual_depth_map)) < 1e-3
 		if fitness is None:
 			return None
 
@@ -122,37 +93,12 @@ class EvolutionStrategy:
 		self.base_position = base_position
 		self.base_orientation = base_orientation
 
-		"""
-		new_position = np.array([-35.23436981, -26.07758012, -161.09738046])
-		new_orientation = np.array([-0.86110491, -0.40747873, -0.30407139])
-		new_up = np.array([0.50811759, -0.71058364, -0.4867108])
-		geno = reverse_to_geno(base_position, base_orientation, new_position, new_orientation, new_up)
-		p1, p2, p3 = move_by_params(base_position, base_orientation, *geno)
-		print(self.get_phenotype((*geno, 1))[-1])
-
-		exit()
-		"""
-		#print(np.linalg.norm(new_position - p1), np.linalg.norm(new_orientation - p2), np.linalg.norm(new_up - p3))
-
-		# Optimal phenotype: (20, 0.15, -150, 1.18, -0.98, -2)
-
 		sample_genos = uniform_sampling(self.rot_scale, self.axial_scale, self.radial_scale, self.orientation_scale, norm_samples, rot_samples, up_rot_samples)
-		#print("Initial population: ", len(sample_genos))
-		#print("Base position before: ", self.base_position)
 		for geno in sample_genos:
 			geno = (*geno, 1)
 			pheno = self.get_phenotype(geno)
 			if pheno is not None:
 				self.population.append((geno, pheno))
-		#print("Survived population: ", len(self.population))
-		#print("Base position after: ", self.base_position)
-	"""
-	def biased_roulette_selection(self, num_samples):
-		weights = np.exp([pop[-1] for pop in self.population])
-		weights /= np.sum(weights)
-		indices = np.random.choice(len(self.population), num_samples, replace = False, p = weights)
-		return [self.population[i] for i in indices]
-	"""
 
 	def best_selection(self, num_samples):
 		self.population.sort(key = self.fitness_compare, reverse = True)
@@ -193,17 +139,8 @@ class EvolutionStrategy:
 		if self.explore_distrib == "normal":
 			self.reduce_scale_for_norm()
 		global_optim = max(self.population, key = self.fitness_compare)
+		optim_iter = -1
 		avg_contour_history = [self.average_population_fitness()]
-
-		"""
-		for geno, pheno in self.population:
-			if geno[-2] == 0:
-				position, orientation, up = move_by_params(self.base_position, self.base_orientation, *geno[ : -1])
-				print(np.linalg.norm(self.base_position - position))
-				self.plotter_debug.add_mesh(pv.Arrow(position, orientation), color = "red")
-		self.plotter_debug.show()
-		"""
-
 
 		for i in range(self.num_generations):
 			offsprings = []
@@ -212,24 +149,9 @@ class EvolutionStrategy:
 			total_trys = 0
 			sum_optims = 0
 
-			"""
-			this_geno = (0, 0, 0, 0, 0, 0, 1)
-			for k in range(50):
-				new_geno = self.pertub_geno(this_geno)
-				position, orientation, up = move_by_params(self.base_position, self.base_orientation, *new_geno[ : -1])
-				self.plotter_debug.add_mesh(pv.Arrow(position, orientation), color = "red")
-				#self.plotter_debug.add_mesh(pv.Arrow(position, up), color = "green")
-			self.plotter_debug.show()
-			exit()
-			"""
-
-
 			while len(offsprings) < self.num_offsprings:
 				this_parent = parents[np.random.randint(len(parents))]
-
-				#this_parent = ((0, 0, 0, 0, 0, 0, 1), "non-specific")
 				new_geno = self.pertub_geno(this_parent[0])
-				#print(new_geno)
 				new_pheno = self.get_phenotype(new_geno)
 				total_trys += 1
 
@@ -237,27 +159,12 @@ class EvolutionStrategy:
 					offsprings.append((new_geno, new_pheno))
 					sum_sigmas += new_geno[-1]
 					sum_optims += new_pheno[-1][0]
-
-				#print(f"{len(offsprings)}/{self.num_offsprings}: {len(offsprings) / total_trys:.4f}")
-				"""
-				prev_position, prev_orientation, prev_up, prev_up_rot, sigma, __ = this_parent
-				this_sigma = self.iterate_sigma(sigma)
-				this_position, this_orientation, this_up, this_up_rot = random_move(
-					self.axial_scale * this_sigma, self.radial_scale * this_sigma, prev_position,
-					self.orientation_scale * this_sigma, prev_orientation,
-					self.up_rot_scale * this_sigma, prev_up_rot, distribution = self.explore_distrib,
-				)
-				this_offspring = self.get_phenotype(this_position, this_orientation, this_up, this_up_rot, this_sigma)
-				if this_offspring is not None:
-					offsprings.append(this_offspring)
-					sum_sigmas += this_sigma
-				"""
 			
 			this_optim = max(offsprings, key = self.fitness_compare)
 			#print("Iter: {} sigma = {:.4f} optimal_contour = {:.4f} mean_contour = {:.4f}".format(i, sum_sigmas / self.num_offsprings, this_optim[1][-1][0], sum_optims / self.num_offsprings))
 			avg_contour_history.append(sum_optims / self.num_offsprings)
 			if self.get_fitness_compare()(this_optim, global_optim) > 0:
-				global_optim = this_optim
+				global_optim, optim_iter = this_optim, i
 			self.population = parents + offsprings
 
 		rgb, dep = get_depth_map(self.plotter, *global_optim[1][ : 3], get_outputs = True)

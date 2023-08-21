@@ -450,10 +450,22 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 				f.write(out)
 	"""
 
+def check_rotation_1(frame_idx, em_path, em_depth_path, output_path, args):
+	real_depth_map = np.load(os.path.join(em_depth_path, f"{frame_idx:06d}.npy"))
+	plt.subplot(1, 2, 1)
+	plt.hist(real_depth_map.ravel(), bins = 20, density = True)
+	plt.subplot(1, 2, 2)
+	plt.imshow(real_depth_map, cmap = "gray")
+	plt.show()
+
 def main():
 	args = get_args()
+	"""
 	args.em_idx = 1
 	frame_idx = 1416
+	"""
+	args.em_idx = 0
+	frame_idx = 680
 	args.try_idx = "non-specific-tryidx"
 	output_path = os.path.join(args.em_base_path, f"EM-virtual-autofix-{args.em_idx}-{frame_idx}-{args.try_idx}")
 	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
@@ -476,7 +488,7 @@ def main():
 		check_rotation(frame_idx, em_path, em_depth_path, output_path, args)
 	"""
 
-	check_rotation(1416, em_path, em_depth_path, output_path, args)
+	check_rotation_1(frame_idx, em_path, em_depth_path, output_path, args)
 
 if __name__ == '__main__':
 	main()
