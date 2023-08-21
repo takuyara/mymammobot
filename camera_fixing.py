@@ -45,6 +45,8 @@ def get_args():
 	parser.add_argument("--up-rot-samples", type = int, default = 6)
 	parser.add_argument("--to-norm-scale", type = float, default = 0.4)
 
+	parser.add_argument("--light-mask-scales", type = int, nargs = "+", default = [0.1, 0.25, 0.4])
+
 	return parser.parse_args()
 
 def fix_single_image(args, img_idx, output_path):
@@ -61,7 +63,8 @@ def fix_single_image(args, img_idx, output_path):
 
 	es = EvolutionStrategy(args.mesh_path, args.img_size, real_depth_map, args.num_parents, args.num_offsprings,
 		args.num_generations, args.axial_scale, lumen_radius * args.radial_scale_rate, args.orientation_scale, args.rot_scale,
-		learning_rate = args.es_learning_rate, contour_tolerance = args.contour_tolerance, to_norm_scale = args.to_norm_scale)
+		learning_rate = args.es_learning_rate, contour_tolerance = args.contour_tolerance, to_norm_scale = args.to_norm_scale,
+		light_mask_scales = args.light_mask_scales)
 
 	es.init_population(base_position, cl_orientation, args.norm_samples, args.rot_samples, args.up_rot_samples)
 	global_optim, rgb_img, dep_img = es.run()
@@ -82,13 +85,15 @@ def main():
 	output_path = os.path.join(args.em_base_path, f"EM-newfix-{args.em_idx}-{args.try_idx}")
 	os.makedirs(output_path, exist_ok = True)
 
+	"""
 	pool = Pool(args.pool_size)
 	for i in range(args.init_idx, len(os.listdir(em_path)) // 2, args.step_size):
 		pool.apply_async(fix_single_image, args = (args, i, output_path))
 	pool.close()
 	pool.join()
+	"""
 	
-	#fix_single_image(args, 1416, output_path)
+	fix_single_image(args, 1416, output_path)
 
 if __name__ == '__main__':
 	main()

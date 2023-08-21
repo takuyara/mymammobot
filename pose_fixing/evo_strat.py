@@ -4,7 +4,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from functools import cmp_to_key
 
-from pose_fixing.similarity import cache_base_data, contour_corr_sim
+from pose_fixing.similarity import cache_multiscale_base_data, multiscale_contour_corr_sim
 from pose_fixing.move_camera import random_move, uniform_sampling, move_by_params, reverse_to_geno
 from ds_gen.depth_map_generation import get_depth_map
 
@@ -15,6 +15,7 @@ class EvolutionStrategy:
 		learning_rate = 0.4, fitness_func = "contour_corr", fitness_kwargs = {},
 		parent_selection = "best", converge_tolerance = None,
 		explore_distrib = "normal", contour_tolerance = 5, to_norm_scale = 0.3,
+		light_mask_scales = [0.1, 0.25, 0.4],
 		):
 		surface = pv.read(mesh_path)
 		self.plotter = pv.Plotter(off_screen = True, window_size = (img_size, img_size))
@@ -32,7 +33,8 @@ class EvolutionStrategy:
 		self.tol = converge_tolerance
 		self.explore_distrib = explore_distrib
 		self.to_norm_scale = to_norm_scale
-		self.contour_cache = cache_base_data(real_depth_map)
+		#self.contour_cache = cache_base_data(real_depth_map)
+		self.contour_cache = cache_multiscale_base_data(real_depth_map, light_mask_scales)
 		# Genotype: position, orientation, up, up_rot, sigma_base, value
 		self.population = []
 		self.contour_tolerance = contour_tolerance
@@ -59,7 +61,7 @@ class EvolutionStrategy:
 		assert fitness_func == "contour_corr" and parent_selection == "best"
 
 	def fitness_func(self, img):
-		return contour_corr_sim(img, self.real_depth_map, *self.contour_cache)
+		return multiscale_contour_corr_sim(img, self.real_depth_map, *self.contour_cache)
 		
 	def get_fitness_compare(self):
 		def compare(pheno_1, pheno_2):

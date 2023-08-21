@@ -15,7 +15,7 @@ def find_optim_thres(em_idx, bins, rate):
 		rd = np.load(os.path.join(em_path, f"{i:06d}.npy"))
 		thres = get_dark_threshold(rd, bins = bins, rate = rate)
 		quantile = np.sum(rd < thres) / len(rd.ravel())
-		out_img = draw_contours(rd, None, quantile)
+		out_img = draw_contours(rd, quantile)
 		cv2.imwrite(os.path.join(out_path, f"{i:06d}.png"), out_img)
 
 if __name__ == '__main__':

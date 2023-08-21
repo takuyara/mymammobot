@@ -307,6 +307,45 @@ def manually_select_alignment(em_idx, try_idx):
 
 	cv2.destroyAllWindows()
 
+def manually_select_alignment_contour(em_idx, try_idx):
+	# Y, 1: Correctly aligned. Could use small adjustions.
+	# N, 0: Nothing alike. Need much larger displacements.
+
+	eval_path = os.path.join(em_base_path, f"EM-newfix-eval-{em_idx}-{try_idx}")
+	y_path = os.path.join(em_base_path, f"EM-newfix-eval-{em_idx}-{try_idx}-good")
+	n_path = os.path.join(em_base_path, f"EM-newfix-eval-{em_idx}-{try_idx}-bad")
+	os.makedirs(y_path, exist_ok = True)
+	os.makedirs(n_path, exist_ok = True)
+
+	for out_img_name in os.listdir(eval_path):
+		img_idx = int(out_img_name.replace(".png", ""))
+
+		if img_idx <= 588:
+			continue
+
+		img = cv2.imread(os.path.join(eval_path, out_img_name))
+		img = cv2.resize(img, (1200, 900))
+		while True:
+			cv2.imshow("img_select", img)
+			key = cv2.waitKey(0) & 0xFF
+			if key == ord("y"):
+				out_path = y_path
+				op = 1
+				break
+			elif key == ord("n"):
+				out_path = n_path
+				op = 0
+				break
+		
+		shutil.copy(os.path.join(eval_path, out_img_name), os.path.join(out_path, out_img_name))
+		
+		with open("select_result_contour.csv", "a", newline = "") as f:
+			writer = csv.writer(f)
+			writer.writerow([em_idx, try_idx, img_idx, op])
+
+	cv2.destroyAllWindows()
+
+
 def plot_corr_mega():
 	with open(out_csv_name, newline = "") as f:
 		reader = csv.DictReader(f)
@@ -420,7 +459,9 @@ if __name__ == '__main__':
 	if sys.argv[1] == "select":
 		manually_select_alignment(int(sys.argv[2]), int(sys.argv[3]))
 	"""
+	"""
 	draw_contour_outputs(0, 0)
 	draw_contour_outputs(1, 0)
 	draw_contour_outputs(2, 0)
-	
+	"""
+	manually_select_alignment_contour(0, 0)

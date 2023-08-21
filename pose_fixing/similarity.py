@@ -83,9 +83,9 @@ def reg_mse_sim(img1, img2, light_weight = light_weight, dark_weight = dark_weig
 	#return -err
 	#return reg.score(img1, img2, weights)
 
-def get_light_mask(img, quantile = None):
+def get_light_mask(img, rate = 0.25, quantile = None):
 	if quantile is None:
-		thres = get_dark_threshold(img)
+		thres = get_dark_threshold(img, rate = rate)
 	else:
 		thres = np.quantile(img.ravel(), quantile)
 	return (img > thres).astype(np.uint8)
@@ -97,11 +97,20 @@ def get_contours(img):
 	contours = np.concatenate(contours, axis = 0).reshape(-1, 2)
 	return contours
 
-def cache_base_data(img):
-	light_mask = get_light_mask(img)
+def cache_base_data(img, rate = 0.25):
+	light_mask = get_light_mask(img, rate = rate)
 	quantile = 1 - np.sum(light_mask) / len(img.ravel())
 	contours = get_contours(light_mask)
 	return contours, quantile, light_mask
+
+def cache_multiscale_base_data(img, scale_rates):
+	base_contours_list, quantile_list, base_light_mask_list = [], [], []
+	for rate in scale_rates:
+		t_c, t_q, t_lm = cache_base_data(img, rate = rate)
+		base_contours_list.append(t_c)
+		quantile_list.append(t_q)
+		base_light_mask_list.append(t_lm)
+	return base_contours_list, quantile_list, base_light_mask_list
 
 def contour_sim(img, base_contours, quantile, light_mask = None):
 	if light_mask is None:
@@ -130,3 +139,13 @@ def contour_corr_sim(img, base_img, base_contours, quantile, base_light_mask):
 	if cont_sim is None or corr_sim is None:
 		return None
 	return cont_sim, corr_sim
+
+def multiscale_contour_corr_sim(img, base_img, base_contours_list, quantile_list, base_light_mask_list):
+	sum_cont_sim, sum_corr_sim = 0, 0
+	for base_contours, quantile, base_light_mask in zip(base_contours_list, quantile_list, base_light_mask_list):
+		res = contour_corr_sim(img, base_img, base_contours, quantile, base_light_mask)
+		if res is None:
+			return None
+		sum_cont_sim += res[0]
+		sum_corr_sim += res[1]
+	return sum_cont_sim / len(quantile_list), sum_corr_sim / len(quantile_list)
