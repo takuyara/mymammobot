@@ -85,6 +85,7 @@ def fix_single_image(args, em_idx, img_idx):
 
 def main():
 	args = get_args()
+	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
 
 	pool = Pool(args.pool_size)
 	for i in range(args.init_idx, len(os.listdir(em_path)) // 2, args.step_size):
