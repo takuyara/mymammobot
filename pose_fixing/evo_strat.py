@@ -171,6 +171,8 @@ class EvolutionStrategy:
 
 		rgb, dep = get_depth_map(self.plotter, *global_optim[1][ : 3], get_outputs = True)
 
+		print(f"Reached optimal at {optim_iter}.")
+
 		if return_history:
 			return global_optim[1], rgb, dep, avg_contour_history
 		else:

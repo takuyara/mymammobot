@@ -319,10 +319,8 @@ def manually_select_alignment_contour(em_idx, try_idx):
 
 	for out_img_name in os.listdir(eval_path):
 		img_idx = int(out_img_name.replace(".png", ""))
-
-		if img_idx <= 588:
+		if img_idx < 588:
 			continue
-
 		img = cv2.imread(os.path.join(eval_path, out_img_name))
 		img = cv2.resize(img, (1200, 900))
 		while True:
@@ -409,10 +407,10 @@ def plot_one_fix_contour(em_idx, img_idx, try_idx):
 	#v_rgb = cv2.imread(os.path.join(em_base_path, f"EM-virtual-{em_idx}", f"{img_idx:06d}.png"))
 	f_rgb = cv2.imread(os.path.join(em_base_path, f"EM-newfix-{em_idx}-{try_idx}", f"{img_idx:06d}.png"))
 
-	base_contours, quantile = cache_base_data(rd)
+	base_contours, quantile, base_light_mask = cache_base_data(rd, rate = 0.1)
 	cont_sim = contour_sim(fd, base_contours, quantile)
-	r_contour_img = draw_contours(rd, base_contours, quantile)
-	f_contour_img = draw_contours(fd, base_contours, quantile)
+	r_contour_img = draw_contours(rd, quantile)
+	f_contour_img = draw_contours(fd, quantile)
 	corr_sim = comb_corr_sim(rd, fd)
 
 	#corr_vd, corr_fd = comb_corr_sim(rd, vd), comb_corr_sim(rd, fd)
@@ -459,9 +457,11 @@ if __name__ == '__main__':
 	if sys.argv[1] == "select":
 		manually_select_alignment(int(sys.argv[2]), int(sys.argv[3]))
 	"""
-	"""
-	draw_contour_outputs(0, 0)
-	draw_contour_outputs(1, 0)
-	draw_contour_outputs(2, 0)
-	"""
-	manually_select_alignment_contour(0, 0)
+	
+	draw_contour_outputs(0, 1)
+	draw_contour_outputs(1, 1)
+	#draw_contour_outputs(2, 0)
+	
+	#manually_select_alignment_contour(1, 0)
+	#draw_contour_outputs(2, 0)
+

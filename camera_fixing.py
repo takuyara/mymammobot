@@ -4,7 +4,6 @@ import cv2
 import time
 import argparse
 import numpy as np
-import pyvista as pv
 from multiprocessing import Pool
 from scipy.spatial.transform import Rotation as R
 
@@ -46,17 +45,20 @@ def get_args():
 	parser.add_argument("--up-rot-samples", type = int, default = 6)
 	parser.add_argument("--to-norm-scale", type = float, default = 0.4)
 
-	parser.add_argument("--light-mask-scales", type = int, nargs = "+", default = [0.1, 0.25, 0.4])
+	parser.add_argument("--light-mask-scales", type = float, nargs = "+", default = [0.1, 0.25, 0.4])
 
 	parser.add_argument("--no-gpu", action = "store_true", default = False)
 
 	return parser.parse_args()
 
-def fix_single_image(args, img_idx, output_path):
+def fix_single_image(args, em_idx, img_idx):
 	st_time = time.time()
 
-	old_pose = np.loadtxt(os.path.join(args.em_base_path, f"EM-{args.em_idx}", f"{img_idx:06d}.txt")).reshape(-1)
-	real_depth_map = np.load(os.path.join(args.em_base_path, f"EM-rawdep-{args.em_idx}", f"{img_idx:06d}.npy"))
+	output_path = os.path.join(args.em_base_path, f"EM-newfix-{em_idx}-{args.try_idx}")
+	os.makedirs(output_path, exist_ok = True)
+
+	old_pose = np.loadtxt(os.path.join(args.em_base_path, f"EM-{em_idx}", f"{img_idx:06d}.txt")).reshape(-1)
+	real_depth_map = np.load(os.path.join(args.em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
 	all_cls = load_all_cls(args.cl_base_path)
 
 	base_position, quaternion = old_pose[ : 3], old_pose[3 : ]
@@ -77,27 +79,18 @@ def fix_single_image(args, img_idx, output_path):
 
 	with open(args.output_metadata, "a", newline = "") as f:
 		writer = csv.writer(f)
-		writer.writerow([args.em_idx, img_idx, args.try_idx, *global_optim[-1], *global_optim[ : 3]])
+		writer.writerow([em_idx, img_idx, args.try_idx, *global_optim[-1], *global_optim[ : 3]])
 
 	print(f"Frame {img_idx} done. Estimated per frame parallel time in {((time.time() - st_time) / args.pool_size / 60):.2f} minutes.", flush = True)
 
 def main():
 	args = get_args()
 
-	if args.no_gpu:
-		pv.start_xvfb()
-	
-	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
-	output_path = os.path.join(args.em_base_path, f"EM-newfix-{args.em_idx}-{args.try_idx}")
-	os.makedirs(output_path, exist_ok = True)
-
 	pool = Pool(args.pool_size)
 	for i in range(args.init_idx, len(os.listdir(em_path)) // 2, args.step_size):
-		pool.apply_async(fix_single_image, args = (args, i, output_path))
+		pool.apply_async(fix_single_image, args = (args, args.em_idx, i))
 	pool.close()
 	pool.join()
-	
-	#fix_single_image(args, 1416, output_path)
 
 if __name__ == '__main__':
 	main()
