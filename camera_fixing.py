@@ -47,6 +47,8 @@ def get_args():
 
 	parser.add_argument("--light-mask-scales", type = float, nargs = "+", default = [0.1, 0.25, 0.4])
 
+	parser.add_argument("--input-csv-path", type = str, default = None)
+
 	parser.add_argument("--no-gpu", action = "store_true", default = False)
 
 	return parser.parse_args()
@@ -85,11 +87,21 @@ def fix_single_image(args, em_idx, img_idx):
 
 def main():
 	args = get_args()
-	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
+
+	em_img_indices = []
+	if args.input_csv_path is None:
+		em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
+		for i in range(args.init_idx, len(os.listdir(em_path)) // 2, args.step_size):
+			em_img_indices.append((args.em_idx, i))
+	else:
+		with open(args.input_csv_path, newline = "") as f:
+			reader = csv.reader(f)
+			for row in reader:
+				em_img_indices.append((int(row[0]), int(row[1])))
 
 	pool = Pool(args.pool_size)
-	for i in range(args.init_idx, len(os.listdir(em_path)) // 2, args.step_size):
-		pool.apply_async(fix_single_image, args = (args, args.em_idx, i))
+	for em_idx, img_idx in em_img_indices:
+		pool.apply_async(fix_single_image, args = (args, em_idx, img_idx))
 	pool.close()
 	pool.join()
 

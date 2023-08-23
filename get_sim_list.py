@@ -319,9 +319,16 @@ def manually_select_alignment_contour(em_idx, try_idx):
 
 	for out_img_name in os.listdir(eval_path):
 		img_idx = int(out_img_name.replace(".png", ""))
-		if img_idx < 588:
+		img_path = os.path.join(eval_path, out_img_name)
+		processed = False
+		for possible_path in [y_path, n_path]:
+			if os.path.exists(os.path.join(possible_path, out_img_name)):
+				processed = True
+				break
+		if processed:
+			print(f"Skipping EM-{em_idx}-{img_idx} of try {try_idx}.")
 			continue
-		img = cv2.imread(os.path.join(eval_path, out_img_name))
+		img = cv2.imread(img_path)
 		img = cv2.resize(img, (1200, 900))
 		while True:
 			cv2.imshow("img_select", img)
@@ -458,10 +465,24 @@ if __name__ == '__main__':
 		manually_select_alignment(int(sys.argv[2]), int(sys.argv[3]))
 	"""
 	
-	draw_contour_outputs(0, 1)
-	draw_contour_outputs(1, 1)
+	#draw_contour_outputs(1, 0)
+	"""
+	draw_contour_outputs(0, 2)
+	draw_contour_outputs(1, 2)
+	draw_contour_outputs(2, 0)
+	draw_contour_outputs(2, 2)
+	"""
+
+	#draw_contour_outputs(0, 1)
+	#draw_contour_outputs(1, 1)
 	#draw_contour_outputs(2, 0)
 	
-	#manually_select_alignment_contour(1, 0)
+	manually_select_alignment_contour(0, 0)
+	manually_select_alignment_contour(0, 2)
+	manually_select_alignment_contour(1, 0)
+	manually_select_alignment_contour(1, 2)
+	manually_select_alignment_contour(2, 0)
+	manually_select_alignment_contour(2, 2)
+
 	#draw_contour_outputs(2, 0)
 
