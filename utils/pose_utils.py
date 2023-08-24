@@ -2,6 +2,8 @@ import numpy as np
 from torch import nn
 from scipy.spatial.transform import Rotation as R
 
+from ds_gen.camera_features import camera_params
+
 def get_3dof_quat(quat):
 	quat *= np.sign(quat[0])
 	if np.linalg.norm(quat[1 : ]) != 0:
@@ -36,6 +38,10 @@ def compute_rotation_quaternion(src, tgt):
 	else:
 		K = np.eye(3)
 	return R.from_matrix(K).as_quat()
+
+def get_output_array(position, orientation):
+	quaternion = compute_rotation_quaternion(camera_params["forward_direction"], orientation)
+	return np.concatenate([position, quaternion]).reshape(1, -1)
 
 class Metrics:
 	def __init__(self, loss_fun, inv_trans, main_metric, rot_coef = None):

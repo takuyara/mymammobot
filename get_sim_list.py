@@ -437,6 +437,7 @@ def plot_one_fix_contour(em_idx, img_idx, try_idx):
 	plt.suptitle(f"EM-{em_idx}-{img_idx} {cont_sim:.0f}, {corr_sim:.4f}")
 
 def draw_contour_outputs(em_idx, try_idx):
+	plt.figure(figsize = (20, 15))
 	fix_path = os.path.join(em_base_path, f"EM-newfix-{em_idx}-{try_idx}")
 	eval_path = os.path.join(em_base_path, f"EM-newfix-eval-{em_idx}-{try_idx}")
 	os.makedirs(eval_path, exist_ok = True)
@@ -448,8 +449,50 @@ def draw_contour_outputs(em_idx, try_idx):
 		plt.savefig(os.path.join(eval_path, f"{img_idx:06d}.png"))
 		plt.clf()
 
+
+def plot_sim_scatter():
+	trys_data = {}
+	with open("new_reg_params_from_doc.csv", newline = "") as f:
+		reader = csv.reader(f)
+		for row in reader:
+			em_idx, img_idx, try_idx = int(row[0]), int(row[1]), int(row[2])
+			cont_sim, corr_sim = float(row[3]), float(row[4])
+			if (em_idx, img_idx) in trys_data:
+				print(f"Warning: multiple trys ({try_idx}, {trys_data[(em_idx, img_idx)][-1]}) for same image {em_idx}, {img_idx}.")
+			trys_data[(em_idx, img_idx)] = (cont_sim, corr_sim, try_idx)
+	
+	cont_sims, corr_sims = [[], []], [[], []]
+	with open("select_result_contour.csv", newline = "") as f:
+		reader = csv.reader(f)
+		for row in reader:
+			em_idx, try_idx, img_idx, label = int(row[0]), int(row[1]), int(row[2]), int(row[3])
+			cont_sim, corr_sim, try_idx_1 = trys_data[(em_idx, img_idx)]
+			if try_idx_1 != try_idx:
+				print(f"Warning: wrong trys ({try_idx}, {try_idx_1}) for same image {em_idx}, {img_idx}.")
+			cont_sims[label].append(cont_sim)
+			corr_sims[label].append(corr_sim)
+
+	"""
+	plt.subplot(2, 2, 1)
+	plt.hist(cont_sims[0], range = (-35, 0), density = True)
+	plt.title("Cont sim Wrong")
+	plt.subplot(2, 2, 2)
+	plt.hist(cont_sims[1], range = (-35, 0), density = True)
+	plt.title("Cont sim Correct")
+	plt.subplot(2, 2, 3)
+	plt.hist(corr_sims[0], range = (0.7, 1.0), density = True)
+	plt.title("Corr sim Wrong")
+	plt.subplot(2, 2, 4)
+	plt.hist(corr_sims[1], range = (0.7, 1.0), density = True)
+	plt.title("Corr sim Correct")
+	plt.show()
+	"""
+
+	print(f"Cont sim right: {np.mean(cont_sims[1])} wrong: {np.mean(cont_sims[0])}")
+	print(f"Corr sim right: {np.mean(corr_sims[1])} wrong: {np.mean(corr_sims[0])}")
+
 if __name__ == '__main__':
-	plt.figure(figsize = (20, 15))
+	#plt.figure(figsize = (20, 15))
 	#write_sim_list()
 	#plot_sim_list()
 	#plot_corr_mega()
@@ -473,16 +516,21 @@ if __name__ == '__main__':
 	draw_contour_outputs(2, 2)
 	"""
 
-	#draw_contour_outputs(0, 1)
-	#draw_contour_outputs(1, 1)
-	#draw_contour_outputs(2, 0)
+	manually_select_alignment_contour(0, 3)
+	manually_select_alignment_contour(1, 3)
+	manually_select_alignment_contour(2, 3)
 	
+
+
+	"""
 	manually_select_alignment_contour(0, 0)
 	manually_select_alignment_contour(0, 2)
 	manually_select_alignment_contour(1, 0)
 	manually_select_alignment_contour(1, 2)
 	manually_select_alignment_contour(2, 0)
 	manually_select_alignment_contour(2, 2)
+	"""
 
 	#draw_contour_outputs(2, 0)
 
+	#plot_sim_scatter()

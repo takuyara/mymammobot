@@ -58,13 +58,17 @@ def in_mesh_bounds(x, all_cls, n_candidates = 50):
 	return np.linalg.norm(x - proj) <= radius
 """
 
-def in_mesh_bounds(x, all_cls, cl_indices, tolerance = 0.5, n_candidates = 50):
+def get_cl_radius(x, all_cls, cl_indices):
 	cl_idx, on_line_idx = cl_indices
 	points, radiuses = all_cls[cl_idx]
 	proj = project_point_to_line(x, points[on_line_idx, ...], points[on_line_idx + 1, ...], fix_oob = False)
 	l_dist = np.linalg.norm(proj - points[on_line_idx, ...])
 	r_dist = np.linalg.norm(proj - points[on_line_idx + 1, ...])
 	radius = (radiuses[on_line_idx, ...] * l_dist + radiuses[on_line_idx + 1, ...] * r_dist) / (l_dist + r_dist)
+	return radius
+
+def in_mesh_bounds(x, all_cls, cl_indices, tolerance = 0.5):
+	radius = get_cl_radius(x, all_cls, cl_indices)
 	return np.linalg.norm(x - proj) <= radius + tolerance
 
 def get_cl_direction(all_cls, cl_indices):
@@ -74,5 +78,46 @@ def get_cl_direction(all_cls, cl_indices):
 	res = res / np.linalg.norm(res)
 	return res
 
-def get_segmented_cls(all_cls):
-	seg_points, seg_radiuses = [], []
+def get_direction_dist_radius(all_cls, cl_indices):
+	cl_idx, on_line_idx = cl_indices
+	cl_point_base = all_cls[cl_idx][0][on_line_idx, ...]
+	cl_next_point = all_cls[cl_idx][0][on_line_idx + 1, ...]
+	lumen_radius = min(all_cls[cl_idx][1][on_line_idx], all_cls[cl_idx][1][on_line_idx + 1])
+	axial_len = np.linalg.norm(cl_next_point - cl_point_base)
+	cl_orientation = (cl_next_point - cl_point_base) / axial_len
+	return cl_orientation, axial_len, lumen_radius
+
+def index2point(all_cls, cl_indices):
+	return all_cls[cl_indices[0]][0][cl_indices[1], ...]
+
+def check_proj_on_cl_seqs(point, all_cls, cl_seqs, tolerance):
+	for cl_seq in cl_seqs:
+		for i in range(len(cl_seq) - 1):
+			proj = project_point_to_line(point, index2point(all_cls, cl_seq[i]), index2point(all_cls, cl_seq[i + 1]))
+			if np.linalg.norm(proj - point) < tolerance:
+				return True
+	return False
+
+def get_unique_cl_indices(all_cls, tolerance = 0.1):
+	cl_seqs = []
+	current_buffer = []
+	num_total_points = 0
+	for cl_idx, this_cl in enumerate(all_cls):
+		this_cl_points = this_cl[0]
+		for on_line_idx, point in enumerate(this_cl_points):
+			num_total_points += 1
+			if not check_proj_on_cl_seqs(point, all_cls, cl_seqs, tolerance):
+				current_buffer.append((cl_idx, on_line_idx))
+			else:
+				if len(current_buffer) > 0:
+					cl_seqs.append(current_buffer)
+					current_buffer = []
+		if len(current_buffer) > 0:
+			cl_seqs.append(current_buffer)
+			current_buffer = []
+	cl_seq_flatten = []
+	for cl_seq in cl_seqs:
+		for cl_indices in cl_seq:
+			cl_seq_flatten.append(cl_indices)
+	print(f"Survived: {len(cl_seq_flatten)} / {num_total_points}.")
+	return cl_seq_flatten

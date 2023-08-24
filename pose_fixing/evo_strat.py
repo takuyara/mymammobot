@@ -15,7 +15,7 @@ class EvolutionStrategy:
 		learning_rate = 0.4, fitness_func = "contour_corr", fitness_kwargs = {},
 		parent_selection = "best", converge_tolerance = None,
 		explore_distrib = "normal", contour_tolerance = 5, to_norm_scale = 0.3,
-		light_mask_scales = [0.1, 0.25, 0.4],
+		light_mask_scales = [0.1, 0.25, 0.4], up_rot_scale = None,
 		):
 		surface = pv.read(mesh_path)
 		self.plotter = pv.Plotter(off_screen = True, window_size = (img_size, img_size))
@@ -41,6 +41,8 @@ class EvolutionStrategy:
 		self.fitness_compare = cmp_to_key(self.get_fitness_compare())
 		self.base_position = None
 		self.base_orientation = None
+		self.up_rot_scale = rot_scale if up_rot_scale is None else up_rot_scale
+		self.scale_normed = False
 
 		"""
 		if fitness_func == "weighted_corr":
@@ -77,6 +79,10 @@ class EvolutionStrategy:
 	def iterate_sigma(self, sigma):
 		return sigma * np.exp(self.learning_rate * np.random.randn())
 
+	def pertub_geno(self, geno):
+		sigma = self.iterate_sigma(geno[-1])
+		return (*random_move(*geno[ : -1], sigma * self.rot_scale, sigma * self.axial_scale, sigma * self.radial_scale, sigma * self.orientation_scale, sigma * self.up_rot_scale), sigma)
+
 	def get_phenotype(self, geno):
 		# Genotype: orient_rot, orient_norm, radial_rot, radial_norm, axial_norm, up_rot, sigma
 		# Sigma not passed to move cameras.
@@ -98,6 +104,19 @@ class EvolutionStrategy:
 		sample_genos = uniform_sampling(self.rot_scale, self.axial_scale, self.radial_scale, self.orientation_scale, norm_samples, rot_samples, up_rot_samples)
 		for geno in sample_genos:
 			geno = (*geno, 1)
+			pheno = self.get_phenotype(geno)
+			if pheno is not None:
+				self.population.append((geno, pheno))
+
+	def init_population_norm(self, base_position, base_orientation, base_up_rot):
+		self.population = []
+		self.base_position = base_position
+		self.base_orientation = base_orientation
+		self.reduce_scale_for_norm()
+
+		base_geno = (0, 0, 0, 0, 0, base_up_rot, 1)
+		while len(self.population) < self.num_offsprings + self.num_parents:
+			geno = self.pertub_geno(base_geno)
 			pheno = self.get_phenotype(geno)
 			if pheno is not None:
 				self.population.append((geno, pheno))
@@ -125,14 +144,14 @@ class EvolutionStrategy:
 		plt.show()
 
 	def reduce_scale_for_norm(self):
+		if self.scale_normed:
+			return
 		self.axial_scale *= self.to_norm_scale
 		self.radial_scale *= self.to_norm_scale
 		self.orientation_scale *= self.to_norm_scale
 		self.rot_scale *= self.to_norm_scale
-
-	def pertub_geno(self, geno):
-		sigma = self.iterate_sigma(geno[-1])
-		return (*random_move(*geno[ : -1], sigma * self.rot_scale, sigma * self.axial_scale, sigma * self.radial_scale, sigma * self.orientation_scale), sigma)
+		self.up_rot_scale *= self.to_norm_scale
+		self.scale_normed = True
 
 	def average_population_fitness(self):
 		return sum([pop[1][-1][0] for pop in self.population]) / len(self.population)

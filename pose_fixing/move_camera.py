@@ -57,13 +57,13 @@ def random_move_depr(axial_scale, radial_scale, position_base, orientation_scale
 def uniform_norm(scale, num_samples):
 	return np.arange(1, num_samples + 1) * scale / num_samples
 
-def random_move(orient_rot, orient_norm, radial_rot, radial_norm, axial_norm, up_rot, rot_scale, axial_scale, radial_scale, orientation_scale):
+def random_move(orient_rot, orient_norm, radial_rot, radial_norm, axial_norm, up_rot, rot_scale, axial_scale, radial_scale, orientation_scale, up_rot_scale):
 	t_orient_rot = orient_rot + np.random.randn() * rot_scale
 	t_orient_norm = orient_norm + np.random.randn() * orientation_scale
 	t_radial_rot = radial_rot + np.random.randn() * rot_scale
 	t_radial_norm = radial_norm + np.random.randn() * radial_scale
 	t_axial_norm = axial_norm + np.random.randn() * axial_scale
-	t_up_rot = up_rot + np.random.randn() * rot_scale
+	t_up_rot = up_rot + np.random.randn() * up_rot_scale
 	return t_orient_rot, t_orient_norm, t_radial_rot, t_radial_norm, t_axial_norm, t_up_rot
 
 def move_by_params(position, orientation, orient_rot, orient_norm, radial_rot, radial_norm, axial_norm, up_rot):
@@ -71,6 +71,7 @@ def move_by_params(position, orientation, orient_rot, orient_norm, radial_rot, r
 	#print(f"Radial: {radial_norm:.4f}, Axial: {axial_norm:.4f}.")
 	t_position = position + orientation * axial_norm + rotate_single_vector(orient_perp, orientation, radial_rot) * radial_norm
 	t_orientation = orientation + rotate_single_vector(orient_perp, orientation, orient_rot) * orient_norm
+	t_orientation = t_orientation / np.linalg.norm(t_orientation)
 	orient_perp = arbitrary_perpendicular_vector(t_orientation)
 	up = rotate_single_vector(orient_perp, t_orientation, up_rot)
 	#print(np.linalg.norm(position - b_position))
