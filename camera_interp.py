@@ -91,7 +91,7 @@ def main():
 
 	pool = Pool(args.pool_size)
 	for this_data in all_data:
-		pool.apply_async(fix_single_image, args = (args, ), kwargs = this_data)
+		pool.apply_async(fix_single_image, args = (args, ), kwds = this_data)
 	pool.close()
 	pool.join()
 
