@@ -89,16 +89,22 @@ def main():
 	ed = int(st + num_work_per)
 	all_data = all_data[st : ed]
 
+	"""
 	pool = Pool(args.pool_size)
 	for this_data in all_data:
 		pool.apply_async(fix_single_image, args = (args, ), kwds = this_data)
 	pool.close()
 	pool.join()
+	"""
 
 	"""
 	this_data = all_data[0]
 	fix_single_image(args, **this_data)
 	"""
+
+	for this_data in all_data:
+		print(this_data["img_idx"])
+	print("Lines: ", len(all_data) * 2)
 
 if __name__ == '__main__':
 	main()

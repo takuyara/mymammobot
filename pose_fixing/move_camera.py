@@ -77,19 +77,24 @@ def move_by_params(position, orientation, orient_rot, orient_norm, radial_rot, r
 	#print(np.linalg.norm(position - b_position))
 	return t_position, t_orientation, up
 
+def get_radial_axial_offsets(position, orientation, t_position):
+	position_offset = t_position - position
+	axial_norm = np.dot(position_offset, orientation)
+	radial_offset = position_offset - axial_norm * orientation
+	radial_norm = np.linalg.norm(radial_offset)
+	orient_perp = arbitrary_perpendicular_vector(orientation)
+	radial_rot = get_rotate_angle(orient_perp, radial_offset / radial_norm, orientation)
+	return radial_rot, radial_norm, axial_norm
+
 def reverse_to_geno(position, orientation, t_position, t_orientation, t_up):
 	full_len_orientation = t_orientation / np.dot(t_orientation, orientation)
 	orient_offset = full_len_orientation - orientation
 	orient_norm = np.linalg.norm(orient_offset)
 	orient_perp = arbitrary_perpendicular_vector(orientation)
 	orient_rot = get_rotate_angle(orient_perp, orient_offset / orient_norm, orientation)
-	position_offset = t_position - position
-	axial_norm = np.dot(position_offset, orientation)
-	radial_offset = position_offset - axial_norm * orientation
-	radial_norm = np.linalg.norm(radial_offset)
-	radial_rot = get_rotate_angle(orient_perp, radial_offset / radial_norm, orientation)
+
 	up_rot = get_rotate_angle(arbitrary_perpendicular_vector(t_orientation), t_up, t_orientation)
-	return orient_rot, orient_norm, radial_rot, radial_norm, axial_norm, up_rot
+	return orient_rot, orient_norm, *get_radial_axial_offsets(position, orientation, t_position), up_rot
 
 def uniform_sampling(rot_scale, axial_scale, radial_scale, orientation_scale, norm_samples, rot_samples, up_rot_samples):
 	orient_combs = [(0, 0)]

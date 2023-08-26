@@ -39,9 +39,27 @@ def compute_rotation_quaternion(src, tgt):
 		K = np.eye(3)
 	return R.from_matrix(K).as_quat()
 
-def get_output_array(position, orientation):
-	quaternion = compute_rotation_quaternion(camera_params["forward_direction"], orientation)
-	return np.concatenate([position, quaternion]).reshape(1, -1)
+def camera_pose_to_train_pose(position, orientation, up, reshape_for_output = False):
+	# From camera coordinate to global coordinate
+	cam_coord = np.stack([camera_params["forward_direction"], camera_params["up_direction"]], axis = 0)
+	global_coord = np.stack([orientation, up], axis = 0)
+	"""
+	print(np.linalg.norm(orientation), np.linalg.norm(up))
+	print(cam_coord.shape, global_coord.shape)
+	"""
+	rot = R.align_vectors(global_coord, cam_coord)[0]
+	"""
+	print(np.allclose(rot.apply(camera_params["forward_direction"]), orientation))
+	print(np.allclose(rot.apply(camera_params["up_direction"]), up))
+
+	print(rot.apply(camera_params["forward_direction"]), orientation)
+	print(rot.apply(camera_params["up_direction"]), up)
+	"""
+	res = np.concatenate([position, rot.as_quat()], axis = 0)
+	#print(res.shape)
+	if reshape_for_output:
+		res = res.reshape(1, -1)
+	return res
 
 class Metrics:
 	def __init__(self, loss_fun, inv_trans, main_metric, rot_coef = None):

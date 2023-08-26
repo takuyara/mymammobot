@@ -1,10 +1,12 @@
 import argparse
-hidden_arg_names = ["base_dir", "train_split", "val_split", "batch_size", "epochs", "output_dim", "img_size", "num_workers", "device", "save_path", "data_stats"]
+hidden_arg_names = ["base_dir", "train_split", "val_split", "batch_size", "epochs", "output_dim", "img_size", "num_workers", "device", "save_path", "data_stats", "mesh_path"]
 
 def get_base_parser(parser):
 	parser.add_argument("--base-dir", type = str, default = "./depth-images", help = "The base dataset dir.")
 	parser.add_argument("--train-split", type = str, default = "trains1.txt", help = "The path to train set split.")
 	parser.add_argument("--val-split", type = str, default = "vals1.txt", help = "The path to val set split.")
+	parser.add_argument("--mesh-path", type = str, default = "./meshes/Airway_Phantom_AdjustSmooth.stl")
+	parser.add_argument("--cpu-rotate", action = "store_true", default = False)
 	parser.add_argument("-lr", "--learning-rate", type = float, default = 1e-3, help = "The learning rate.")
 	parser.add_argument("-e", "--epochs", type = int, default = 20, help = "The number of epochs for training.")
 	parser.add_argument("-b", "--batch-size", type = int, default = 32, help = "The batch size.")
@@ -81,6 +83,8 @@ def get_args(*reqs):
 		elif req == "test":
 			parser = get_test_parser(parser)
 	args = parser.parse_args()
+	if args.cpu_rotate:
+		args.mesh_path = None
 	for arg_name, arg_value in vars(args).items():
 		if arg_name not in hidden_arg_names:
 			print(f"{arg_name}: {arg_value}")

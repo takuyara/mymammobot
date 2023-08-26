@@ -16,3 +16,11 @@ vn_scale = 0.4474117306519036
 vn_const = 1.1016112671704779
 def get_velocity_norm(size):
 	return fatiguelife.rvs(vn_const, loc = vn_loc, scale = vn_scale, size = size)
+
+
+# Not decided yet
+def get_max_radial_offset(radius):
+	return radius * 0.9
+
+def get_max_orient_offset(radius):
+	return 10

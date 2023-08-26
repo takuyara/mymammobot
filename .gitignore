@@ -164,3 +164,4 @@ emcoords.csv
 rename_files.py
 *_vis
 *.csv
+virtual_dataset

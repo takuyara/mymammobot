@@ -39,6 +39,28 @@ def locate_on_cl(x, all_cls, n_candidates = 50):
 				min_dist, cl_pos = np.linalg.norm(x_ - x), (cl_idx, i)
 	return cl_pos
 
+def find_all_possible_cls(x, all_cls, n_candidates = 50, tolerance = 2):
+	res_list = []
+	for cl_idx, (cl_points, cl_radiuses) in enumerate(all_cls):
+		cl_dists = np.sum((cl_points - x) ** 2, axis = 1)
+		this_cl_optim = 1e10
+		for i in np.argsort(cl_dists)[ : n_candidates]:
+			if i + 1 >= len(cl_points):
+				continue
+			x_ = project_point_to_line(x, cl_points[i, ...], cl_points[i + 1, ...])
+			t_dst = np.linalg.norm(x - x_)
+			if t_dst < this_cl_optim:
+				this_cl_optim, this_cl_optim_index = t_dst, i
+		res_list.append((this_cl_optim, cl_idx, this_cl_optim_index))
+	res_list.sort()
+	res_indices = []
+	for t_dst, cl_idx, on_line_idx in res_list:
+		if t_dst - res_list[0][0] < tolerance:
+			res_indices.append((cl_idx, on_line_idx))
+		else:
+			break
+	return res_indices
+
 def project_to_cl(x, all_cls, n_candidates = 50, return_cl_indices = False):
 	cl_idx, on_line_idx = locate_on_cl(x, all_cls, n_candidates)
 	points, radiuses = all_cls[cl_idx]
@@ -78,43 +100,56 @@ def get_cl_direction(all_cls, cl_indices):
 	res = res / np.linalg.norm(res)
 	return res
 
-def get_direction_dist_radius(all_cls, cl_indices):
+def get_direction_dist_radius(all_cls, cl_indices, smoothing_dist = 5):
 	cl_idx, on_line_idx = cl_indices
 	cl_point_base = all_cls[cl_idx][0][on_line_idx, ...]
 	cl_next_point = all_cls[cl_idx][0][on_line_idx + 1, ...]
 	lumen_radius = min(all_cls[cl_idx][1][on_line_idx], all_cls[cl_idx][1][on_line_idx + 1])
 	axial_len = np.linalg.norm(cl_next_point - cl_point_base)
-	cl_orientation = (cl_next_point - cl_point_base) / axial_len
+	cl_next_point_smooth = all_cls[cl_idx][0][min(on_line_idx + smoothing_dist, len(all_cls[cl_idx][0]) - 1), ...]
+	cl_orientation = cl_next_point_smooth - cl_point_base
+	cl_orientation /= np.linalg.norm(cl_orientation)
 	return cl_orientation, axial_len, lumen_radius
 
 def index2point(all_cls, cl_indices):
 	return all_cls[cl_indices[0]][0][cl_indices[1], ...]
 
-def check_proj_on_cl_seqs(point, all_cls, cl_seqs, tolerance):
-	for cl_seq in cl_seqs:
-		for i in range(len(cl_seq) - 1):
-			proj = project_point_to_line(point, index2point(all_cls, cl_seq[i]), index2point(all_cls, cl_seq[i + 1]))
-			if np.linalg.norm(proj - point) < tolerance:
+def check_proj_on_cl_seqs(x, all_cls, cl_seqs_p, tolerance, n_candidates = 10):
+	for cl_points in cl_seqs_p:
+		cl_points = np.array(cl_points)
+		cl_dists = np.sum((cl_points - x) ** 2, axis = 1)
+		for i in np.argsort(cl_dists)[ : n_candidates]:
+			if i + 1 >= len(cl_points):
+				continue
+			x_ = project_point_to_line(x, cl_points[i, ...], cl_points[i + 1, ...])
+			if np.linalg.norm(x_ - x) < tolerance:
 				return True
 	return False
 
 def get_unique_cl_indices(all_cls, tolerance = 0.1):
 	cl_seqs = []
+	cl_seqs_p = []
 	current_buffer = []
+	current_buffer_p = []
 	num_total_points = 0
 	for cl_idx, this_cl in enumerate(all_cls):
 		this_cl_points = this_cl[0]
 		for on_line_idx, point in enumerate(this_cl_points):
 			num_total_points += 1
-			if not check_proj_on_cl_seqs(point, all_cls, cl_seqs, tolerance):
+			if not check_proj_on_cl_seqs(point, all_cls, cl_seqs_p, tolerance):
 				current_buffer.append((cl_idx, on_line_idx))
+				current_buffer_p.append(point)
 			else:
 				if len(current_buffer) > 0:
 					cl_seqs.append(current_buffer)
+					cl_seqs_p.append(current_buffer_p)
 					current_buffer = []
+					current_buffer_p = []
 		if len(current_buffer) > 0:
 			cl_seqs.append(current_buffer)
+			cl_seqs_p.append(current_buffer_p)
 			current_buffer = []
+			current_buffer_p = []
 	cl_seq_flatten = []
 	for cl_seq in cl_seqs:
 		for cl_indices in cl_seq:

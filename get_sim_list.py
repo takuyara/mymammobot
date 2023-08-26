@@ -436,6 +436,38 @@ def plot_one_fix_contour(em_idx, img_idx, try_idx):
 
 	plt.suptitle(f"EM-{em_idx}-{img_idx} {cont_sim:.0f}, {corr_sim:.4f}")
 
+def plot_one_fix_interp(em_idx, img_idx, try_idx):
+	plt.clf()
+	rd = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+	#vd = np.load(os.path.join(em_base_path, f"EM-virtual-{em_idx}", f"{img_idx:06d}.npy"))
+	fd = np.load(os.path.join(em_base_path, f"EM-interpfix-{em_idx}-{try_idx}", f"{img_idx:06d}.npy"))
+	r_rgb = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"))
+	#v_rgb = cv2.imread(os.path.join(em_base_path, f"EM-virtual-{em_idx}", f"{img_idx:06d}.png"))
+	f_rgb = cv2.imread(os.path.join(em_base_path, f"EM-interpfix-{em_idx}-{try_idx}", f"{img_idx:06d}.png"))
+
+	base_contours, quantile, base_light_mask = cache_base_data(rd, rate = 0.1)
+	cont_sim = contour_sim(fd, base_contours, quantile)
+	r_contour_img = draw_contours(rd, quantile)
+	f_contour_img = draw_contours(fd, quantile)
+	corr_sim = comb_corr_sim(rd, fd)
+
+	#corr_vd, corr_fd = comb_corr_sim(rd, vd), comb_corr_sim(rd, fd)
+	plt.subplot(2, 2, 1)
+	plt.imshow(r_rgb)
+	plt.title("Real RGB Frame")
+	plt.subplot(2, 2, 2)
+	plt.imshow(f_rgb)
+	plt.title("Fixed RGB Frame")
+	plt.subplot(2, 2, 3)
+	plt.imshow(r_contour_img)
+	plt.title("Real Depth Map")
+	plt.subplot(2, 2, 4)
+	plt.imshow(f_contour_img)
+	plt.title(f"Fixed Depth Map")
+
+	plt.suptitle(f"EM-{em_idx}-{img_idx} {cont_sim:.0f}, {corr_sim:.4f}")
+
+
 def draw_contour_outputs(em_idx, try_idx):
 	plt.figure(figsize = (20, 15))
 	fix_path = os.path.join(em_base_path, f"EM-newfix-{em_idx}-{try_idx}")
@@ -446,6 +478,20 @@ def draw_contour_outputs(em_idx, try_idx):
 			continue
 		img_idx = int(fixed_map_path.replace(".npy", ""))
 		plot_one_fix_contour(em_idx, img_idx, try_idx)
+		plt.savefig(os.path.join(eval_path, f"{img_idx:06d}.png"))
+		plt.clf()
+
+
+def draw_interp_outputs(em_idx, try_idx):
+	plt.figure(figsize = (20, 15))
+	fix_path = os.path.join(em_base_path, f"EM-interpfix-{em_idx}-{try_idx}")
+	eval_path = os.path.join(em_base_path, f"EM-interpfix-eval-{em_idx}-{try_idx}")
+	os.makedirs(eval_path, exist_ok = True)
+	for fixed_map_path in os.listdir(fix_path):
+		if not fixed_map_path.endswith(".npy"):
+			continue
+		img_idx = int(fixed_map_path.replace(".npy", ""))
+		plot_one_fix_interp(em_idx, img_idx, try_idx)
 		plt.savefig(os.path.join(eval_path, f"{img_idx:06d}.png"))
 		plt.clf()
 
@@ -516,9 +562,14 @@ if __name__ == '__main__':
 	draw_contour_outputs(2, 2)
 	"""
 
+
+	"""
+
 	manually_select_alignment_contour(0, 3)
 	manually_select_alignment_contour(1, 3)
 	manually_select_alignment_contour(2, 3)
+	"""
+	draw_interp_outputs(0, 4)
 	
 
 
