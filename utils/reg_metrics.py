@@ -1,4 +1,5 @@
 import numpy as np
+from utils.pose_utils import quat_angular_error, revert_quat
 
 class Metrics:
 	def __init__(self, loss_fun, inv_trans, main_metric, rot_coef = None):
