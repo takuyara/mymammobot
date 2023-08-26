@@ -1,3 +1,5 @@
+import numpy as np
+
 class Metrics:
 	def __init__(self, loss_fun, inv_trans, main_metric, rot_coef = None):
 		assert main_metric in ["loss", "trans_err", "rot_err", "comb_err"]
