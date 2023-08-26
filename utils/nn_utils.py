@@ -5,7 +5,7 @@ from torchvision import models
 from torch.utils.data import DataLoader
 
 from utils.file_utils import get_dir_list
-from utils.pose_utils import Metrics
+from utils.reg_metrics import Metrics
 from utils.preprocess import get_img_transform, get_pose_transforms
 
 from datasets.cl_dataset import CLDataset, TestDataset
