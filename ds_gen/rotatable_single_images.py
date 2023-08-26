@@ -22,7 +22,7 @@ def randu_gen(a, b):
 		return np.random.rand() * (b - a) + a
 	return randu
 
-def generate_rotatable_images(mesh_path, cl_path, output_path, num_samples, img_size, zoom_scale = 2 ** -0.5, axial_extend_rate = 0.1, radial_safe_rate = 0.9):	
+def generate_rotatable_images(mesh_path, cl_path, output_path, num_samples, img_size, out_pose_only = False, zoom_scale = 2 ** -0.5, axial_extend_rate = 0.1, radial_safe_rate = 0.9):	
 	all_cls = load_all_cls(cl_path)
 	unique_cl_indices = get_unique_cl_indices(all_cls)
 
@@ -86,7 +86,6 @@ def generate_rotatable_images(mesh_path, cl_path, output_path, num_samples, img_
 
 			t_up = arbitrary_perpendicular_vector(t_orientation)
 
-						
 			rgb, dep = get_depth_map(zoomed_plotter, t_position, t_orientation, t_up, get_outputs = True, zoom = zoom_scale)
 			"""
 			p.camera.position = t_position
@@ -103,14 +102,14 @@ def generate_rotatable_images(mesh_path, cl_path, output_path, num_samples, img_
 
 			"""
 
+			if abs(np.max(np.min(rgb, axis = -1)) - 255) < 1e-2:
+				continue
 
 			out_pose = np.stack([t_position, t_orientation], axis = 0)
-			cv2.imwrite(os.path.join(output_path, f"{img_idx:06d}.png"), rgb)
-			np.save(os.path.join(output_path, f"{img_idx:06d}.npy"), dep)
 			np.savetxt(os.path.join(output_path, f"{img_idx:06d}.txt"), out_pose, fmt = "%.6f")
+			if not out_pose_only:
+				cv2.imwrite(os.path.join(output_path, f"{img_idx:06d}.png"), rgb)
+				np.save(os.path.join(output_path, f"{img_idx:06d}.npy"), dep)
+			
 			img_idx += 1
-			if abs(np.max(np.min(rgb, axis = -1)) - 255) < 1e-2:
-				plt.imshow(rgb)
-				plt.title("Possibly wrong image")
-				plt.show()
 

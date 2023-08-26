@@ -18,14 +18,17 @@ def main():
 	all_cls = load_all_cls("./CL")
 
 	img2lb = {}
+
+	"""
 	with open("select_result_contour_non_interp.csv", newline = "") as f:
 		reader = csv.reader(f)
 		for row in reader:
 			em_idx, try_idx, img_idx, label = int(row[0]), int(row[1]), int(row[2]), int(row[3])
 			img2lb[(em_idx, img_idx, try_idx)] = label
+	"""
 
 	rows = [["em_idx", "img_idx", "try_idx", "cont_sim", "corr_sim", "human_eval", "position", "orientation", "up", "cl_idx", "on_line_idx", "lumen_radius", "orient_rot", "orient_norm", "radial_rot", "radial_norm", "axial_norm", "up_rot", "focal_radial_norm"]]
-	with open("reg_params_non_interp.csv", newline = "") as f:
+	with open("reg_params_interp.csv", newline = "") as f:
 		reader = csv.reader(f)
 		for i, row in enumerate(tqdm(reader)):
 			if len(row) < 3:
@@ -65,7 +68,7 @@ def main():
 			label = img2lb.get((em_idx, img_idx, try_idx), -1)
 			rows.append([em_idx, img_idx, try_idx, cont_sim, corr_sim, label, position, orientation, up, *cl_indices, lumen_radius, *cl_offsets, min_f_radial_norm])
 
-	with open("reg_params_non_interp_processed.csv", "w", newline = "") as f:
+	with open("reg_params_interp_processed.csv", "w", newline = "") as f:
 		writer = csv.writer(f)
 		writer.writerows(rows)
 

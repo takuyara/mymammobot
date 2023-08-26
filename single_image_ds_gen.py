@@ -11,6 +11,7 @@ def get_args():
 	parser.add_argument("--img-size", type = int, default = 224)
 	parser.add_argument("--num-samples", type = int, default = 50000)
 	parser.add_argument("--partition", type = str, default = "train")
+	parser.add_argument("--out-pose-only", action = "store_true", default = False)
 	return parser.parse_args()
 
 def main():
@@ -18,7 +19,7 @@ def main():
 	output_path = os.path.join(args.output_path, args.partition)
 	os.makedirs(output_path, exist_ok = True)
 
-	generate_rotatable_images(args.mesh_path, args.cl_path, output_path, args.num_samples, args.img_size)
+	generate_rotatable_images(args.mesh_path, args.cl_path, output_path, args.num_samples, args.img_size, args.out_pose_only)
 
 if __name__ == '__main__':
 	main()

@@ -350,6 +350,49 @@ def manually_select_alignment_contour(em_idx, try_idx):
 
 	cv2.destroyAllWindows()
 
+def manually_select_alignment_interp(em_idx, try_idx):
+	# Y, 1: Correctly aligned. Could use small adjustions.
+	# N, 0: Nothing alike. Need much larger displacements.
+
+	eval_path = os.path.join(em_base_path, f"EM-interpfix-eval-{em_idx}-{try_idx}")
+	y_path = os.path.join(em_base_path, f"EM-interpfix-eval-{em_idx}-{try_idx}-good")
+	n_path = os.path.join(em_base_path, f"EM-interpfix-eval-{em_idx}-{try_idx}-bad")
+	os.makedirs(y_path, exist_ok = True)
+	os.makedirs(n_path, exist_ok = True)
+
+	for out_img_name in os.listdir(eval_path):
+		img_idx = int(out_img_name.replace(".png", ""))
+		img_path = os.path.join(eval_path, out_img_name)
+		processed = False
+		for possible_path in [y_path, n_path]:
+			if os.path.exists(os.path.join(possible_path, out_img_name)):
+				processed = True
+				break
+		if processed:
+			print(f"Skipping EM-{em_idx}-{img_idx} of try {try_idx}.")
+			continue
+		img = cv2.imread(img_path)
+		img = cv2.resize(img, (1200, 900))
+		while True:
+			cv2.imshow("img_select", img)
+			key = cv2.waitKey(0) & 0xFF
+			if key == ord("y"):
+				out_path = y_path
+				op = 1
+				break
+			elif key == ord("n"):
+				out_path = n_path
+				op = 0
+				break
+		
+		shutil.copy(os.path.join(eval_path, out_img_name), os.path.join(out_path, out_img_name))
+		
+		with open("select_result_contour_interp.csv", "a", newline = "") as f:
+			writer = csv.writer(f)
+			writer.writerow([em_idx, try_idx, img_idx, op])
+
+	cv2.destroyAllWindows()
+
 
 def plot_corr_mega():
 	with open(out_csv_name, newline = "") as f:
@@ -569,9 +612,15 @@ if __name__ == '__main__':
 	manually_select_alignment_contour(1, 3)
 	manually_select_alignment_contour(2, 3)
 	"""
+	"""
 	draw_interp_outputs(0, 4)
-	
+	draw_interp_outputs(1, 4)
+	draw_interp_outputs(2, 4)
+	"""
 
+	manually_select_alignment_interp(0, 4)
+	manually_select_alignment_interp(1, 4)
+	manually_select_alignment_interp(2, 4)
 
 	"""
 	manually_select_alignment_contour(0, 0)
