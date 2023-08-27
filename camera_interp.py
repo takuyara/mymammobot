@@ -12,6 +12,7 @@ from pose_fixing.evo_strat import EvolutionStrategy
 from utils.cl_utils import load_all_cls, project_to_cl, get_cl_direction
 from utils.misc import str_to_arr
 from ds_gen.camera_features import camera_params
+from utils.geometry import get_rotate_angle, arbitrary_perpendicular_vector
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -53,6 +54,8 @@ def fix_single_image(args, em_idx, img_idx, position, orientation, up_rot, orien
 	output_path = os.path.join(args.em_base_path, f"EM-interpfix-{em_idx}-{args.try_idx}")
 	os.makedirs(output_path, exist_ok = True)
 
+	up_rot = get_rotate_angle(arbitrary_perpendicular_vector(orientation), orientation, up_rot)
+
 	real_depth_map = np.load(os.path.join(args.em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
 
 	es = EvolutionStrategy(args.mesh_path, args.img_size, real_depth_map, args.num_parents, args.num_offsprings,
@@ -61,6 +64,7 @@ def fix_single_image(args, em_idx, img_idx, position, orientation, up_rot, orien
 		light_mask_scales = args.light_mask_scales)
 
 	es.init_population_norm(position, orientation, up_rot)
+
 	global_optim, rgb_img, dep_img = es.run()
 
 	cv2.imwrite(os.path.join(output_path, f"{img_idx:06d}.png"), cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR))
@@ -80,7 +84,7 @@ def main():
 		reader = csv.DictReader(f)
 		for row in reader:
 			this_data = {"em_idx": int(row["em_idx"]), "img_idx": int(row["img_idx"]), "position": str_to_arr(row["position"]),
-			"orientation": str_to_arr(row["orientation"]), "up_rot": float(row["up_rot"]), "orientation_scale": float(row["orientation_scale"]),
+			"orientation": str_to_arr(row["orientation"]), "up_rot": str_to_arr(row["up_rot"]), "orientation_scale": float(row["orientation_scale"]),
 			"radial_scale": float(row["radial_scale"]), "axial_scale": float(row["axial_scale"]), "up_rot_scale": float(row["up_rot_scale"])}
 			all_data.append(this_data)
 
