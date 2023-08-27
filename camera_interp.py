@@ -88,7 +88,7 @@ def main():
 			"radial_scale": float(row["radial_scale"]), "axial_scale": float(row["axial_scale"]), "up_rot_scale": float(row["up_rot_scale"])}
 			all_data.append(this_data)
 
-	"""
+	
 	num_work_per = math.ceil(len(all_data) / args.split_parts)
 	st = int(num_work_per * args.cur_part)
 	ed = int(st + num_work_per)
@@ -103,7 +103,7 @@ def main():
 	"""
 	for this_data in all_data:
 		fix_single_image(args, **this_data)
-
+	"""
 
 if __name__ == '__main__':
 	main()
