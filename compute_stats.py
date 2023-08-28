@@ -21,7 +21,7 @@ def compute_pose_stats(base_dir, dir_list):
 
 def compute_img_stats(base_dir, dir_list):
 	sum_pix, sum_var, n_pix = 0, 0, 0
-	trans = get_img_transform(None, "hist_complex")
+	trans = get_img_transform("data_stats.json", "mesh2sfs")
 	for this_dir in dir_list:
 		this_dir = os.path.join(base_dir, this_dir)
 		this_path_indices = []
