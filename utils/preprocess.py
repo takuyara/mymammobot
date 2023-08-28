@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from torchvision import transforms
 from scipy.spatial.transform import Rotation as R
+from scipy.ndimage import gaussian_filter
 
 from ds_gen.rotatable_single_images import rotate_and_crop
 from ds_gen.depth_map_generation import get_depth_map
@@ -24,8 +25,8 @@ def random_rotate_camera(img, pose, img_size, plotter = None, rotatable = True):
 	return img, pose
 
 def get_img_transform(data_stats_path, method = "norm"):
+	stats = json.load(open(data_stats_path))
 	if method in ["sfs2mesh", "mesh2sfs", "sfs", "mesh"]:
-		stats = json.load(open(data_stats_path))
 		if method in ["sfs2mesh", "mesh"]:
 			img_mean, img_std = stats["mesh_mean"], stats["mesh_std"]
 		else:
@@ -34,9 +35,14 @@ def get_img_transform(data_stats_path, method = "norm"):
 			_w, _b = stats["sfs2mesh_weight"], stats["sfs2mesh_bias"]
 		elif method == "mesh2sfs":
 			_w, _b = stats["mesh2sfs_weight"], stats["mesh2sfs_bias"]
+			kernel_size = stats["mesh2sfs_kernel"]
+			radius = (kernel_size - 1) // 2
+			sigma = 0.3 * ((kernel_size - 1) * 0.5 - 1) + 0.8
 		else:
 			_w, _b = 1, 0
 		def reshape_n_norm(img):
+			if method == "mesh2sfs":
+				img = gaussian_filter(img, sigma = sigma, radius = radius)
 			img = torch.tensor(img).float().unsqueeze(0)
 			img = img * _w + _b
 			img = (img - img_mean) / img_std
@@ -67,16 +73,18 @@ def get_img_transform(data_stats_path, method = "norm"):
 			img_hist_heights = np.histogram(img.ravel(), bins = 30, density = True)[0]
 			hist_peak_idx = np.argmax(img_hist_heights)
 			img_hist_heights = img_hist_heights / img_hist_heights[hist_peak_idx]
-			print("Prev: ", [round(x, 1) for x in img_hist_heights])
+			#print("Prev: ", [round(x, 1) for x in img_hist_heights])
 			for j in range(len(img_hist_heights)):
 				i = len(img_hist_heights) - j - 1
 				if i < hist_peak_idx:
 					img_hist_heights[i] += 1
 				if j > 0:
 					img_hist_heights[i] = max(img_hist_heights[i], img_hist_heights[i + 1])
-			print("Succ: ", [round(x, 1) for x in img_hist_heights])
+			#print("Succ: ", [round(x, 1) for x in img_hist_heights])
 			labels = img_hist_heights[img_hist_indices]
 			labels = labels.reshape(orig_shape)
+			mean, std = stats["hist_complex_mean"], stats["hist_complex_std"]
+			labels = (labels - mean) / std
 			return torch.tensor(labels).float().unsqueeze(0)
 		return img_to_hist_complex
 
