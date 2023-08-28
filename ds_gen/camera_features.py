@@ -5,7 +5,7 @@ from scipy.stats import fatiguelife
 camera_params = {}
 camera_params["focal_length"] = 10
 camera_params["view_angle"] = 90
-camera_params["up_direction"] = np.array([1, 0, 0])
+camera_params["up_direction"] = np.array([0, 1, 0])
 camera_params["forward_direction"] = np.array([0, 0, 1])
 camera_params["clipping_range"] = (3, 100)
 

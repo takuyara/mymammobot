@@ -6,7 +6,6 @@ def get_base_parser(parser):
 	parser.add_argument("--train-split", type = str, default = "trains1.txt", help = "The path to train set split.")
 	parser.add_argument("--val-split", type = str, default = "vals1.txt", help = "The path to val set split.")
 	parser.add_argument("--mesh-path", type = str, default = "./meshes/Airway_Phantom_AdjustSmooth.stl")
-	parser.add_argument("--cpu-rotate", action = "store_true", default = False)
 	parser.add_argument("-lr", "--learning-rate", type = float, default = 1e-3, help = "The learning rate.")
 	parser.add_argument("-e", "--epochs", type = int, default = 20, help = "The number of epochs for training.")
 	parser.add_argument("-b", "--batch-size", type = int, default = 32, help = "The batch size.")
@@ -23,6 +22,12 @@ def get_base_parser(parser):
 	parser.add_argument("--skip-prev-frame", action = "store_true", default = False, help = "Whether the history starts at i-1 or i-K when encoding i.")
 	parser.add_argument("--model-sel-metric", type = str, choices = ["loss", "trans_err", "rot_err", "comb_err"], default = "comb_err", help = "The model selection metric.")
 	parser.add_argument("--model-sel-rot-coef", type = float, default = 0.5, help = "The coefficient applied to rotation error for combined error metric.")
+	parser.add_argument("--train-preprocess", type = str, default = "mesh", choices = ["sfs2mesh", "mesh2sfs", "sfs", "mesh", "quantile", "hist_simple", "hist_complex"])
+	parser.add_argument("--val-preprocess", type = str, default = "sfs2mesh", choices = ["sfs2mesh", "mesh2sfs", "sfs", "mesh", "quantile", "hist_simple", "hist_complex"])
+	parser.add_argument("--train-rotatable", action = "store_true", default = False)
+	parser.add_argument("--val-rotatable", action = "store_true", default = False)
+	parser.add_argument("--train-gen", action = "store_true", default = False)
+	parser.add_argument("--val-gen", action = "store_true", default = False)
 	return parser
 
 def get_r3d_parser(parser):
@@ -64,6 +69,9 @@ def get_test_parser(parser):
 	parser.add_argument("--test-split", type = str, default = "tests1.txt", help = "The path to test set (real images) split.")
 	parser.add_argument("--test-modality", type = str, default = "SFS", choices = ["SFS", "mesh"], help = "The test modality.")
 	parser.add_argument("--save-predictions", action = "store_true", default = False, help = "Whether save the predicted trajectory (as well as the ground truth) for plot.")
+	parser.add_argument("--test-preprocess", type = str, default = "sfs2mesh", choices = ["sfs2mesh", "mesh2sfs", "sfs", "mesh", "quantile", "hist_simple", "hist_complex"])
+	parser.add_argument("--test-gen", action = "store_true", default = False)
+	parser.add_argument("--test-rotatable", action = "store_true", default = False)
 	return parser
 
 def get_args(*reqs):
@@ -83,8 +91,6 @@ def get_args(*reqs):
 		elif req == "test":
 			parser = get_test_parser(parser)
 	args = parser.parse_args()
-	if args.cpu_rotate:
-		args.mesh_path = None
 	for arg_name, arg_value in vars(args).items():
 		if arg_name not in hidden_arg_names:
 			print(f"{arg_name}: {arg_value}")

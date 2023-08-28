@@ -29,30 +29,30 @@ def em_to_poly(path):
 	return tube
 
 def main():
-	airway = pv.read(airway_path)
-	p = pv.Plotter()
-	p.add_mesh(airway, opacity = 0.5)
-	em_idx = int(sys.argv[1])
-	points = []
-	orients = []
-	ups = []
+	em_points = [[], [], []]
+	em_orients = [[], [], []]
+	em_ups = [[], [], []]
+	all_res = [["radial_velocity", "axial_velocity", "total_velocity", "rotation_velocity", "lumen_radius"]]
 
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
 		for row in reader:
-			if int(row["em_idx"]) == em_idx:
-				points.append(str_to_arr(row["position"]))
-				orients.append(str_to_arr(row["orientation"]))
-				ups.append(str_to_arr(row["up"]))
-	points = np.stack(points, axis = 0)
-	orients = np.stack(orients, axis = 0)
-	ups = np.stack(ups, axis = 0)
-	smoothed_poses = smoothing_poses(points, orients, ups, method = "none")
-	velocity_res = get_velocities(smoothed_poses, cl_path)
+			em_idx = int(row["em_idx"])
+			em_points[em_idx].append(str_to_arr(row["position"]))
+			em_orients[em_idx].append(str_to_arr(row["orientation"]))
+			em_ups[em_idx].append(str_to_arr(row["up"]))
+
+	for points, orients, ups in zip(em_points, em_orients, em_ups):
+		points = np.stack(points, axis = 0)
+		orients = np.stack(orients, axis = 0)
+		ups = np.stack(ups, axis = 0)
+		smoothed_poses = smoothing_poses(points, orients, ups, method = "none")
+		velocity_res = get_velocities(smoothed_poses, cl_path)
+		all_res.extend(velocity_res)
 
 	with open("velocity_res.csv", "w", newline = "") as f:
 		writer = csv.writer(f)
-		writer.writerows(velocity_res)
+		writer.writerows(all_res)
 
 	"""
 	poly = pv.lines_from_points(points)

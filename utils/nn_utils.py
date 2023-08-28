@@ -31,15 +31,19 @@ def get_loss_fun(args):
 def get_loaders_loss_metrics(args, test = False, test_set = False, single_img_set = False):
 	input_modality = args.test_modality if test else "mesh"
 	pose_trans, pose_inv_trans = get_pose_transforms(args.data_stats, args.hispose_noise, input_modality)
-	phase_split_path = [("test", args.test_split)] if test else [("train", args.train_split), ("val", args.val_split)]
+	if test:
+		phase_split_path = [("test", args.test_split, args.test_preprocess, args.mesh_path if args.test_gen else None, args.test_rotatable)]
+	else:
+		phase_split_path = [("train", args.train_split, args.train_preprocess, args.mesh_path if args.train_gen else None, args.train_rotatable),
+			("val", args.val_split, args.val_preprocess, args.mesh_path if args.val_gen else None, args.val_rotatable)]
 	if not single_img_set:
 		batch_size, ds_type = (1, TestDataset) if test and test_set else (args.batch_size, CLDataset)
 		datasets = {phase : ds_type(args.base_dir, get_dir_list(split_path), args.length, args.spacing, args.skip_prev_frame,
-			get_img_transform(args.data_stats, args.img_size, input_modality, train = phase == "train"), pose_trans) for phase, split_path in phase_split_path}
+			transform_img = get_img_transform(args.data_stats, preprocess), transform_pose = pose_trans) for phase, split_path, preprocess in phase_split_path}
 	else:
 		batch_size = args.batch_size
-		datasets = {phase : SingleImageDataset(args.base_dir, get_dir_list(split_path), args.img_size, args.mesh_path,
-			transform_img = get_img_transform(args.data_stats, args.img_size, input_modality, train = phase == "train"), transform_pose = pose_trans) for phase, split_path in phase_split_path}
+		datasets = {phase : SingleImageDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, rotatable = rotate,
+			transform_img = get_img_transform(args.data_stats, preprocess), transform_pose = pose_trans) for phase, split_path, preprocess, mesh_path, rotate in phase_split_path}
 
 	dataloaders = {phase : DataLoader(ds, batch_size = batch_size,
 		num_workers = args.num_workers, shuffle = phase == "train") for phase, ds in datasets.items()}

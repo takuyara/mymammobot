@@ -9,7 +9,7 @@ from utils.pose_utils import get_6dof_pose_label
 from utils.preprocess import random_rotate_camera
 
 class SingleImageDataset(Dataset):
-	def __init__(self, base_dir, dir_list, img_size, mesh_path, pack_data_size = 3, transform_img = None, transform_pose = None):
+	def __init__(self, base_dir, dir_list, img_size, mesh_path, rotatable, pack_data_size = 3, transform_img = None, transform_pose = None):
 		super(SingleImageDataset, self).__init__()
 		self.samples = []
 		for this_dir in dir_list:
@@ -18,6 +18,7 @@ class SingleImageDataset(Dataset):
 				self.samples.append((this_dir, i))
 		self.transform_img, self.transform_pose = transform_img, transform_pose
 		self.img_size = img_size
+		self.rotatable = rotatable
 		if mesh_path is None:
 			self.plotter = None
 		else:
@@ -34,7 +35,7 @@ class SingleImageDataset(Dataset):
 		else:
 			img = None
 		pose = np.loadtxt(os.path.join(p, f"{i:06d}.txt"))
-		img, pose = random_rotate_camera(img, pose[0, ...], pose[1, ...], self.img_size, self.plotter)
+		img, pose = random_rotate_camera(img, pose, self.img_size, self.plotter, self.rotatable)
 		pose = get_6dof_pose_label(pose)
 		
 		if self.transform_img is not None:

@@ -9,24 +9,73 @@ from ds_gen.depth_map_generation import get_depth_map
 from utils.pose_utils import compute_rotation_quaternion, get_3dof_quat, revert_quat, camera_pose_to_train_pose
 from utils.geometry import rotate_single_vector, arbitrary_perpendicular_vector
 
-def random_rotate_camera(img, position, orientation, img_size, plotter = None):
-	deg = np.random.rand() * 360
-	up = rotate_single_vector(arbitrary_perpendicular_vector(orientation), orientation, deg)
-	if plotter is None:
-		img = rotate_and_crop(img, deg, img_size)
+def random_rotate_camera(img, pose, img_size, plotter = None, rotatable = True):
+	position, orientation = pose[0, ...], pose[1, ...]
+	if rotatable:
+		deg = np.random.rand() * 360
+		up = rotate_single_vector(arbitrary_perpendicular_vector(orientation), orientation, deg)
+		if plotter is None:
+			img = rotate_and_crop(img, deg, img_size)
+		else:
+			img = get_depth_map(plotter, position, orientation, up)
 	else:
-		img = get_depth_map(plotter, position, orientation, up)
+		up = pose[2, ...]
 	pose = camera_pose_to_train_pose(position, orientation, up)
 	return img, pose
 
-def get_img_transform(data_stats_path, img_size, modality, train = False):
-	stats = json.load(open(data_stats_path))
-	img_mean, img_std = stats["img_mean"], stats["img_std"]
-	def reshape_n_norm(img):
-		img = torch.tensor(img).float().unsqueeze(0)
-		img = (img - img_mean) / img_std
-		return img
-	return reshape_n_norm
+def get_img_transform(data_stats_path, method = "norm"):
+	if method in ["sfs2mesh", "mesh2sfs", "sfs", "mesh"]:
+		stats = json.load(open(data_stats_path))
+		if method in ["sfs2mesh", "mesh"]:
+			img_mean, img_std = stats["mesh_mean"], stats["mesh_std"]
+		else:
+			img_mean, img_std = stats["sfs_mean"], stats["sfs_std"]
+		if method == "sfs2mesh":
+			_w, _b = stats["sfs2mesh_weight"], stats["sfs2mesh_bias"]
+		elif method == "mesh2sfs":
+			_w, _b = stats["mesh2sfs_weight"], stats["mesh2sfs_bias"]
+		else:
+			_w, _b = 1, 0
+		def reshape_n_norm(img):
+			img = torch.tensor(img).float().unsqueeze(0)
+			img = img * _w + _b
+			img = (img - img_mean) / img_std
+			return img			
+		return reshape_n_norm
+	elif method == "quantile":
+		def img_to_quantile(img):
+			orig_shape = img.shape
+			img = img.ravel()
+			q = np.argsort(img)
+			q = np.argsort(q)
+			q = q / len(q)
+			q = q.reshape(orig_shape)
+			q = torch.tensor(q).float().unsqueeze(0)
+			return q
+		return img_to_quantile
+	elif method == "hist_simple":
+		def img_to_hist_simple(img, bins = 30):
+			img = (img - img.min()) / (img.max() - img.min())
+			img = np.floor(img * bins) / bins
+			return img
+		return img_to_hist_simple
+	elif method == "hist_complex":
+		def img_to_hist_complex(img, bins = 30):
+			img = (img - img.min()) / (img.max() - img.min())
+			img_hist_indices = np.floor(img * bins).astype(int)
+			img_hist_heights = np.histogram(img.ravel(), bins = 30, density = True)[0]
+			hist_peak_idx = np.argmax(img_hist_heights)
+			img_hist_heights = img_hist_heights / img_hist_heights[hist_peak_idx]
+			print("Prev: ", img_hist_heights)
+			for j in range(len(img_hist_heights)):
+				i = len(img_hist_heights) - j - 1
+				if j < hist_peak_idx:
+					img_hist_heights[i] += 1
+				if j > 0:
+					img_hist_heights[i] = max(img_hist_heights[i], img_hist_heights[i + 1])
+			print("Succ: ", img_hist_heights)
+			return img_hist_heights
+		return img_to_hist_complex
 
 def get_pose_transforms(data_stats_path, hispose_noise, modality):
 	stats = json.load(open(data_stats_path))
