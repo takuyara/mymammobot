@@ -15,12 +15,12 @@ def random_rotate_camera(img, pose, img_size, plotter = None, rotatable = True):
 	if rotatable:
 		deg = np.random.rand() * 360
 		up = rotate_single_vector(arbitrary_perpendicular_vector(orientation), orientation, deg)
-		if plotter is None:
-			img = rotate_and_crop(img, deg, img_size)
-		else:
-			img = get_depth_map(plotter, position, orientation, up)
 	else:
 		up = pose[2, ...]
+	if plotter is None:
+		img = rotate_and_crop(img, deg, img_size)
+	else:
+		img = get_depth_map(plotter, position, orientation, up)
 	pose = camera_pose_to_train_pose(position, orientation, up)
 	return img, pose
 

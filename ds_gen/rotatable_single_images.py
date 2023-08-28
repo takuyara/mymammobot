@@ -13,7 +13,8 @@ from ds_gen.camera_features import get_max_radial_offset, get_max_orient_offset,
 
 def rotate_and_crop(img, deg, img_size):
 	# Clockwise
-	img = ndimage.rotate(img, -deg, reshape = False)
+	if not np.allclose(deg, 0):
+		img = ndimage.rotate(img, -deg, reshape = False)
 	st = (img.shape[0] - img_size) // 2
 	return img[st : st + img_size, st : st + img_size]
 
