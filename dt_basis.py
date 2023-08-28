@@ -53,11 +53,11 @@ def main():
 	print(f"RD: ({rd_min:.2f}, {rd_max:.2f}), VD: ({vd_min:.2f}, {vd_max:.2f}).")
 	device = "cuda"
 	train_dloader, test_dloader = get_simple_loaders(paired_paths)
-	#model = SFS2Mesh(rd_min, rd_max, vd_min, vd_max).to(device)
-	model = Mesh2SFS(rd_min, rd_max, vd_min, vd_max).to(device)
+	model = SFS2Mesh(rd_min, rd_max, vd_min, vd_max).to(device)
+	#model = Mesh2SFS(rd_min, rd_max, vd_min, vd_max).to(device)
 	optimiser = optim.Adam(model.parameters(), lr = 1e-3)
 	#plot_one_batch(model, test_dloader, device)
-	for epoch in range(50):
+	for epoch in range(20):
 		#print(model.contrast_factor.item())
 		for phase, dloader in [("train", train_dloader), ("test", test_dloader)]:
 			with torch.set_grad_enabled(phase == "train"):

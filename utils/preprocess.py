@@ -57,24 +57,27 @@ def get_img_transform(data_stats_path, method = "norm"):
 		def img_to_hist_simple(img, bins = 30):
 			img = (img - img.min()) / (img.max() - img.min())
 			img = np.floor(img * bins) / bins
-			return img
+			return torch.tensor(img).float().unsqueeze(0)
 		return img_to_hist_simple
 	elif method == "hist_complex":
 		def img_to_hist_complex(img, bins = 30):
+			orig_shape = img.shape
 			img = (img - img.min()) / (img.max() - img.min())
-			img_hist_indices = np.floor(img * bins).astype(int)
+			img_hist_indices = np.minimum(np.floor(img * bins).astype(int), bins - 1)
 			img_hist_heights = np.histogram(img.ravel(), bins = 30, density = True)[0]
 			hist_peak_idx = np.argmax(img_hist_heights)
 			img_hist_heights = img_hist_heights / img_hist_heights[hist_peak_idx]
-			print("Prev: ", img_hist_heights)
+			print("Prev: ", [round(x, 1) for x in img_hist_heights])
 			for j in range(len(img_hist_heights)):
 				i = len(img_hist_heights) - j - 1
-				if j < hist_peak_idx:
+				if i < hist_peak_idx:
 					img_hist_heights[i] += 1
 				if j > 0:
 					img_hist_heights[i] = max(img_hist_heights[i], img_hist_heights[i + 1])
-			print("Succ: ", img_hist_heights)
-			return img_hist_heights
+			print("Succ: ", [round(x, 1) for x in img_hist_heights])
+			labels = img_hist_heights[img_hist_indices]
+			labels = labels.reshape(orig_shape)
+			return torch.tensor(labels).float().unsqueeze(0)
 		return img_to_hist_complex
 
 def get_pose_transforms(data_stats_path, hispose_noise, modality):

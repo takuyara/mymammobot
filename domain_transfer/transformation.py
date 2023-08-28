@@ -66,10 +66,10 @@ class Mesh2SFS(nn.Module):
 		initial_shape = sfs_img.shape
 		sfs_img, mesh_img = sfs_img.unsqueeze(1), mesh_img.unsqueeze(1)
 		#mesh_img = (mesh_img - self.mesh_min) / (self.mesh_max - self.mesh_min)
-		mesh_img = (mesh_img - self.mesh_min) / (self.clip - self.mesh_min)
-		mesh_img = torch.clamp(mesh_img, 0, 1)
-		mesh_img = F.adjust_gamma(mesh_img, gamma = self.gamma)
-		mesh_img = F.gaussian_blur(mesh_img, kernel_size = self.blur_kernel)
+		#mesh_img = (mesh_img - self.mesh_min) / (self.clip - self.mesh_min)
+		#mesh_img = torch.clamp(mesh_img, 0, 1)
+		#mesh_img = F.adjust_gamma(mesh_img, gamma = self.gamma)
+		#mesh_img = F.gaussian_blur(mesh_img, kernel_size = self.blur_kernel)
 		sfs_img_f, mesh_img_f = sfs_img.reshape(sfs_img.size(0), -1), mesh_img.reshape(mesh_img.size(0), -1)
 		mesh_solved_f = self._w * mesh_img_f + self._b
 		loss = nn.MSELoss()(sfs_img_f, mesh_solved_f)
