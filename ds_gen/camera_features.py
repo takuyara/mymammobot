@@ -54,5 +54,9 @@ def dynamic_rotation_velocity_gen():
 		return rotation_velocity_list[idx]
 	return r_vel_gen
 
-def check_valid_focal_radial_norm(focal_radial_norm, lumen_radius):
+def is_valid_focal_radial_norm(focal_radial_norm, lumen_radius):
 	return focal_radial_norm < 10
+
+def is_valid_radial_norm(radial_norm, lumen_radius):
+	#return radial_norm < lumen_radius
+	return True

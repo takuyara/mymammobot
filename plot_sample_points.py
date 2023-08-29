@@ -53,6 +53,8 @@ def main():
 	points = []
 	orients = []
 	ups = []
+	"""
+
 
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
@@ -76,7 +78,7 @@ def main():
 	gen_points = np.stack(gen_points, axis = 0)
 	gen_orients = np.stack(gen_orients, axis = 0)
 
-	for i in range(len(points)):
+		for i in range(len(points)):
 		p.add_mesh(pv.Arrow(points[i, ...], orients[i, ...]), color = "red")
 
 	for i in range(len(gen_points)):
@@ -84,8 +86,14 @@ def main():
 
 	for path in cl_paths:
 		p.add_mesh(cl_to_poly(path), color = "blue")
+	"""
 
-	#p.add_points(points, render_points_as_spheres = True, point_size = 5, color = "red")
+	points = np.load("./virtual_dataset/video_sequence/train/0-0-0-0.npy")[ : , 0, : ]
+
+	p.add_points(points, render_points_as_spheres = True, point_size = 5, color = "red")
+
+	points = np.load("./virtual_dataset/video_sequence/val/0-0-0-0.npy")[ : , 0, : ]
+	p.add_points(points, render_points_as_spheres = True, point_size = 5, color = "blue")
 	#p.add_points(gen_points, render_points_as_spheres = True, point_size = 5, color = "green")
 	p.show()
 

@@ -26,7 +26,7 @@ def random_rotate_camera(img, pose, img_size, plotter = None, rotatable = True):
 	pose = camera_pose_to_train_pose(position, orientation, up)
 	return img, pose
 
-def get_img_transform(data_stats_path, method = "norm", n_channels = 3):
+def get_img_transform(data_stats_path, method, n_channels):
 	stats = json.load(open(data_stats_path))
 	if method in ["sfs2mesh", "mesh2sfs", "sfs", "mesh"]:
 		if method in ["sfs2mesh", "mesh"]:

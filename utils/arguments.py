@@ -28,6 +28,7 @@ def get_base_parser(parser):
 	parser.add_argument("--val-rotatable", action = "store_true", default = False)
 	parser.add_argument("--train-gen", action = "store_true", default = False)
 	parser.add_argument("--val-gen", action = "store_true", default = False)
+	parser.add_argument("--n-channels", type = int, default = 1)
 	return parser
 
 def get_r3d_parser(parser):

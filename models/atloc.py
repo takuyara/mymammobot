@@ -32,14 +32,15 @@ class FourDirectionalLSTM(nn.Module):
         return torch.cat([hlr_fw, hlr_bw, hud_fw, hud_bw], dim=1)
 
 class AtLoc(nn.Module):
-    def __init__(self, feature_extractor, droprate=0.5, pretrained=True, feat_dim=2048, lstm=False):
+    def __init__(self, feature_extractor, droprate=0.5, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
         super(AtLoc, self).__init__()
         self.droprate = droprate
         self.lstm = lstm
 
         # replace the last FC layer in feature extractor
         self.feature_extractor = feature_extractor
-        #self.feature_extractor.conv1 = nn.Conv2d(1, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
+        if n_channels != 3:
+            self.feature_extractor.conv1 = nn.Conv2d(n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
         self.feature_extractor.avgpool = nn.AdaptiveAvgPool2d(1)
         fe_out_planes = self.feature_extractor.fc.in_features
         self.feature_extractor.fc = nn.Linear(fe_out_planes, feat_dim)
