@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 def main():
 	id2data = {}
-	lumen_radius, radial_norm, orient_norm = [], [], []
+	lumen_radius, radial_norm, orient_norm, velocity_norm = [], [], [], []
 	"""
 	with open("reg_params_non_interp_processed.csv", newline = "") as f:
 		reader = csv.DictReader(f)
@@ -25,9 +25,10 @@ def main():
 		reader = csv.DictReader(f)
 		for row in reader:
 			lumen_radius.append(float(row["lumen_radius"]))
-			radial_norm.append(float(row["radial_velocity"]))
+			#radial_norm.append(float(row["radial_velocity"]))
+			velocity_norm.append(float(row["total_velocity"]))
 
-	plt.scatter(lumen_radius, radial_norm)
+	plt.scatter(lumen_radius, velocity_norm)
 	plt.show()
 
 if __name__ == '__main__':

@@ -26,7 +26,7 @@ def random_rotate_camera(img, pose, img_size, plotter = None, rotatable = True):
 	pose = camera_pose_to_train_pose(position, orientation, up)
 	return img, pose
 
-def get_img_transform(data_stats_path, method = "norm"):
+def get_img_transform(data_stats_path, method = "norm", n_channels = 3):
 	stats = json.load(open(data_stats_path))
 	if method in ["sfs2mesh", "mesh2sfs", "sfs", "mesh"]:
 		if method in ["sfs2mesh", "mesh"]:
@@ -45,7 +45,7 @@ def get_img_transform(data_stats_path, method = "norm"):
 		def reshape_n_norm(img):
 			if method == "mesh2sfs":
 				img = gaussian_filter(img, sigma = sigma, radius = radius)
-			img = torch.tensor(img).float().unsqueeze(0)
+			img = torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
 			img = img * _w + _b
 			img = (img - img_mean) / img_std
 			return img			
@@ -58,21 +58,21 @@ def get_img_transform(data_stats_path, method = "norm"):
 			q = np.argsort(q)
 			q = q / len(q)
 			q = q.reshape(orig_shape)
-			q = torch.tensor(q).float().unsqueeze(0)
+			q = torch.tensor(q).float().unsqueeze(0).repeat(n_channels, 1, 1)
 			return q
 		return img_to_quantile
 	elif method == "hist_simple":
 		def img_to_hist_simple(img, bins = 30):
 			img = (img - img.min()) / (img.max() - img.min())
 			img = np.floor(img * bins) / bins
-			return torch.tensor(img).float().unsqueeze(0)
+			return torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
 		return img_to_hist_simple
 	elif method == "hist_complex":
 		def img_to_hist_complex(img, bins = 30):
 			orig_shape = img.shape
 			img = (img - img.min()) / (img.max() - img.min())
 			img_hist_indices = np.minimum(np.floor(img * bins).astype(int), bins - 1)
-			img_hist_heights = np.histogram(img.ravel(), bins = 30, density = True)[0]
+			img_hist_heights = np.histogram(img.ravel(), bins = bins, density = True)[0]
 			hist_peak_idx = np.argmax(img_hist_heights)
 			img_hist_heights = img_hist_heights / img_hist_heights[hist_peak_idx]
 			#print("Prev: ", [round(x, 1) for x in img_hist_heights])
@@ -87,7 +87,7 @@ def get_img_transform(data_stats_path, method = "norm"):
 			labels = labels.reshape(orig_shape)
 			mean, std = stats["hist_complex_mean"], stats["hist_complex_std"]
 			labels = (labels - mean) / std
-			return torch.tensor(labels).float().unsqueeze(0)
+			return torch.tensor(labels).float().unsqueeze(0).repeat(n_channels, 1, 1)
 		return img_to_hist_complex
 
 def get_pose_transforms(data_stats_path, hispose_noise, modality):

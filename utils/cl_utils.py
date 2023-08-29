@@ -111,6 +111,13 @@ def get_direction_dist_radius(all_cls, cl_indices, smoothing_dist = 5):
 	cl_orientation /= np.linalg.norm(cl_orientation)
 	return cl_orientation, axial_len, lumen_radius
 
+def get_direction_radius_dynamics(points, radius, idx, smoothing_dist = 5):
+	if idx == len(points) - 1:
+		idx = idx - 1
+	orient = points[min(idx + smoothing_dist, len(points) - 1), ...] - points[idx, ...]
+	orient = orient / np.linalg.norm(orient)
+	return orient, min(radius[idx], radius[idx + 1])
+
 def index2point(all_cls, cl_indices):
 	return all_cls[cl_indices[0]][0][cl_indices[1], ...]
 
@@ -156,3 +163,33 @@ def get_unique_cl_indices(all_cls, tolerance = 0.1):
 			cl_seq_flatten.append(cl_indices)
 	print(f"Survived: {len(cl_seq_flatten)} / {num_total_points}.")
 	return cl_seq_flatten
+
+def get_first_diff(pts1, pts2, tolerance = 0.1, n_candidates = 20):
+	for on_line_idx_1, pt1 in enumerate(pts1):
+		cl_dists = np.sum((pt1 - pts2) ** 2, axis = 1)
+		for i in np.argsort(cl_dists)[ : n_candidates]:
+			if i + 1 >= len(pts2):
+				continue
+			x_ = project_point_to_line(pt1, pts2[i, ...], pts2[i + 1, ...])
+			if np.linalg.norm(x_ - pt1) < tolerance:
+				return on_line_idx_1
+	return None
+
+def get_unique_between_pairs(all_cls, cl_idx_1, cl_idx_2, turning_buffer = 10):
+	unq_idx_1 = get_first_diff(all_cls[cl_idx_1][0], all_cls[cl_idx_2][0])
+	unq_idx_2 = get_first_diff(all_cls[cl_idx_2][0], all_cls[cl_idx_1][0])
+	st_idx_1 = max(0, unq_idx_1 - turning_buffer)
+	st_idx_2 = max(0, unq_idx_2 - turning_buffer)
+	pt1, rd1 = all_cls[cl_idx_1][0][st_idx_1 : ], all_cls[cl_idx_1][1][st_idx_1 : ]
+	pt2, rd2 = all_cls[cl_idx_2][0][st_idx_2 : ], all_cls[cl_idx_2][1][st_idx_2 : ]
+	r_points = np.concatenate([np.flip(pt1), pt2], axis = 0)
+	r_radius = np.concatenate([np.flip(rd1), rd2], axis = 0)
+	return r_points, r_radius
+
+def project_to_line_dynamics(points, radius, x, cur_idx, n_candidates = 30):
+	min_dist = 1e10
+	for i in range(max(cur_idx - n_candidates // 2, 0), min(cur_idx + n_candidates // 2, len(points) - 1)):
+		x_ = project_point_to_line(x, points[i, ...], points[i + 1, ...])
+		if np.linalg.norm(x_ - x) < min_dist:
+			min_dist, ret_idx = np.linalg.norm(x_ - x), i
+	return i, radius[i], min_dist

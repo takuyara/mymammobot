@@ -6,10 +6,11 @@ from scipy import ndimage
 
 import matplotlib.pyplot as plt
 
+from utils.misc import randu_gen
 from utils.cl_utils import load_all_cls, get_unique_cl_indices, get_direction_dist_radius, index2point
 from utils.geometry import arbitrary_perpendicular_vector, rotate_single_vector
 from ds_gen.depth_map_generation import get_zoomed_plotter, get_depth_map
-from ds_gen.camera_features import get_max_radial_offset, get_max_orient_offset, camera_params
+from ds_gen.camera_features import static_radial_offset_gen, static_focal_radial_offset_gen, camera_params
 
 def rotate_and_crop(img, deg, img_size):
 	# Clockwise
@@ -17,11 +18,6 @@ def rotate_and_crop(img, deg, img_size):
 		img = ndimage.rotate(img, -deg, reshape = False)
 	st = (img.shape[0] - img_size) // 2
 	return img[st : st + img_size, st : st + img_size]
-
-def randu_gen(a, b):
-	def randu():
-		return np.random.rand() * (b - a) + a
-	return randu
 
 def generate_rotatable_images(mesh_path, cl_path, output_path, num_samples, img_size, out_pose_only = False, zoom_scale = 2 ** -0.5, axial_extend_rate = 0.1, radial_safe_rate = 0.9):	
 	all_cls = load_all_cls(cl_path)
@@ -32,13 +28,15 @@ def generate_rotatable_images(mesh_path, cl_path, output_path, num_samples, img_
 	zoomed_plotter.add_mesh(surface)
 
 	total_volume = 0
+	total_cl_len = 0
 	for cl_idx, on_line_idx in unique_cl_indices:
 		if on_line_idx == len(all_cls[cl_idx][0]) - 1:
 			continue
 		cl_orientation, axial_len, lumen_radius = get_direction_dist_radius(all_cls, (cl_idx, on_line_idx))
 		total_volume += axial_len * lumen_radius ** 2
+		total_cl_len += axial_len
 
-	print(f"Volume = {total_volume:.2f}.")
+	print(f"Volume = {total_volume:.2f}. Total len = {total_cl_len:.2f}")
 
 	#total_volume = 18000
 
@@ -54,11 +52,11 @@ def generate_rotatable_images(mesh_path, cl_path, output_path, num_samples, img_
 		orient_perp = arbitrary_perpendicular_vector(cl_orientation)
 
 		axial_norm_gen = randu_gen(- axial_extend_rate * axial_len, (1 + axial_extend_rate) * axial_len)
-		radial_norm_gen = randu_gen(0, get_max_radial_offset(lumen_radius) * radial_safe_rate)
-		focal_radial_norm_gen = randu_gen(0, get_max_orient_offset(lumen_radius))
+		radial_norm_gen = static_radial_offset_gen(lumen_radius)
+		focal_radial_norm_gen = static_focal_radial_offset_gen(lumen_radius)
 		angle_gen = randu_gen(0, 360)
 
-		num_samples_on_this_cl = int(round((axial_len * lumen_radius ** 2) / total_volume * num_samples))
+		num_samples_on_this_cl = int(round(axial_len / total_cl_len * num_samples))
 
 		#print(cl_orientation)
 
