@@ -22,9 +22,14 @@ def random_rotate_camera(img, pose, img_size, plotter = None, rotatable = True):
 		img = rotate_and_crop(img, deg, img_size)
 	else:
 		img = get_depth_map(plotter, position, orientation, up)
-	img = np.nan_to_num(img, nan = np.nanmax(img))
+	img = np.nan_to_num(img, nan = 200)
+	"""
 	if np.any(np.isnan(img)):
 		img = np.zeros_like(img)
+		print("Replaced")
+	if np.any(np.isnan(img)):
+		print("FUCK")
+	"""
 	pose = camera_pose_to_train_pose(position, orientation, up)
 	return img, pose
 
@@ -72,7 +77,10 @@ def get_img_transform(data_stats_path, method, n_channels):
 	elif method == "hist_complex":
 		def img_to_hist_complex(img, bins = 30):
 			orig_shape = img.shape
-			img = (img - img.min()) / (img.max() - img.min())
+			if np.allclose(img.max(), img.min()):
+				img = np.zeros_like(img)
+			else:
+				img = (img - img.min()) / (img.max() - img.min())
 			img_hist_indices = np.minimum(np.floor(img * bins).astype(int), bins - 1)
 			img_hist_heights = np.histogram(img.ravel(), bins = bins, density = True)[0]
 			hist_peak_idx = np.argmax(img_hist_heights)

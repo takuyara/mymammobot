@@ -65,7 +65,6 @@ class CLDataset(Dataset):
 			pose = self.dir_to_pose_dict[full_path][img_idx, ...]
 			img, pose = random_rotate_camera(img, pose, self.img_size, self.plotter, False)
 			pose = get_6dof_pose_label(pose)
-
 			if self.transform_img is not None:
 				img = self.transform_img(img)
 			if self.transform_pose is not None:
