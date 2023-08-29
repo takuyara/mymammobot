@@ -14,8 +14,9 @@ class SingleImageDataset(Dataset):
 		self.samples = []
 		for this_dir in dir_list:
 			this_dir = os.path.join(base_dir, this_dir)
-			for i in range(len(os.listdir(this_dir)) // pack_data_size):
-				self.samples.append((this_dir, i))
+			for path in os.listdir(this_dir):
+				if path.endswith(".txt"):
+					self.samples.append((this_dir, int(path.replace(".txt", ""))))
 		self.transform_img, self.transform_pose = transform_img, transform_pose
 		self.img_size = img_size
 		self.rotatable = rotatable
