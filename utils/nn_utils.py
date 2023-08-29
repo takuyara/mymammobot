@@ -57,7 +57,13 @@ def get_models(args, *names):
 	res_models = []
 	for t_name in names:
 		if t_name.startswith("atloc"):
-			model = AtLoc(models.resnet34(pretrained = True), droprate = args.dropout, feat_dim = args.img_encode_dim, n_channels = args.n_channels).to(device)
+			if args.atloc_base == "resnet18":
+				base = models.resnet18(weights = models.ResNet18_Weights.DEFAULT)
+			elif args.atloc_base == "resnet34":
+				base = models.resnet34(weights = models.ResNet34_Weights.DEFAULT)
+			elif args.atloc_base == "resnet50":
+				base = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
+			model = AtLoc(base, droprate = args.dropout, feat_dim = args.img_encode_dim, n_channels = args.n_channels).to(device)
 			if t_name.endswith("+"):
 				model.load_state_dict(torch.load(os.path.join(args.save_path, args.atloc_path)))
 		elif t_name.startswith("hisenc"):

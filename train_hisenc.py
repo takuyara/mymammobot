@@ -16,6 +16,7 @@ def train_val(model_fuser, dataloaders, optimiser, epochs, loss_fun, metric_temp
 				model_fuser.eval()
 			this_metric = metric_template.new_copy()
 			for b_id, (history_encode, poses_history, poses_true) in enumerate(dataloaders[phase]):
+				history_encode, poses_history, poses_true = history_encode.to(device), poses_history.to(device), poses_true.to(device)
 				with torch.set_grad_enabled(phase == "train"):
 					poses_pred = model_fuser(history_encode, poses_history)
 					loss = loss_fun(poses_true, poses_pred)
