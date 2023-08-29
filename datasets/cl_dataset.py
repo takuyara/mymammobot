@@ -8,17 +8,7 @@ import torch
 from torch.utils.data import Dataset
 
 from utils.pose_utils import get_6dof_pose_label
-
-import warnings
-warnings.filterwarnings("ignore", category = UserWarning)
-
-def load_single_file(path, idx):
-	this_file = f"{idx:06d}.png"
-	this_img = Image.open(os.path.join(path, this_file)).convert("RGB")
-	this_file = f"{idx:06d}.txt"
-	this_pose = np.loadtxt(os.path.join(path, this_file))
-	this_pose = get_6dof_pose_label(this_pose)
-	return this_img, this_pose
+from utils.preprocess import random_rotate_camera
 
 class CLDataset(Dataset):
 	def __init__(self, base_dir, dir_list, length, spacing, img_size, mesh_path, skip_prev_frame = False, transform_img = None, transform_pose = None):
