@@ -4,7 +4,6 @@ from PIL import Image
 from copy import deepcopy
 import pyvista as pv
 
-import torch
 from torch.utils.data import Dataset
 
 from utils.pose_utils import get_6dof_pose_label
@@ -73,8 +72,8 @@ class CLDataset(Dataset):
 				pose = self.transform_pose(pose, j == len(self.samples[idx]) - 1)
 			input_img.append(img)
 			input_pose.append(pose)
-		input_img = torch.stack(input_img)
-		input_pose = torch.stack(input_pose)
+		input_img = np.stack(input_img)
+		input_pose = np.stack(input_pose)
 		return input_img, input_pose
 
 class TestDataset(Dataset):
@@ -146,5 +145,5 @@ class TestDataset(Dataset):
 			input_img.append(img)
 			input_pose.append(pose)
 			his_indices.append(i)
-		input_img = torch.stack(input_img)
+		input_img = np.stack(input_img)
 		return input_img, input_pose[-1], np.array(indices[ : -1]), indices[-1], use_hisenc
