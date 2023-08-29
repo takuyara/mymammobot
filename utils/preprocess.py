@@ -89,14 +89,15 @@ def get_img_transform(data_stats_path, method, n_channels):
 			for j in range(len(img_hist_heights)):
 				i = len(img_hist_heights) - j - 1
 				if i < hist_peak_idx:
-					img_hist_heights[i] += 1
+					#img_hist_heights[i] += 1
+					img_hist_heights[i] = 1
 				if j > 0:
 					img_hist_heights[i] = max(img_hist_heights[i], img_hist_heights[i + 1])
 			#print("Succ: ", [round(x, 1) for x in img_hist_heights])
 			labels = img_hist_heights[img_hist_indices]
 			labels = labels.reshape(orig_shape)
-			mean, std = stats["hist_complex_mean"], stats["hist_complex_std"]
-			labels = (labels - mean) / std
+			#mean, std = stats["hist_complex_mean"], stats["hist_complex_std"]
+			#labels = (labels - mean) / std
 			return torch.tensor(labels).float().unsqueeze(0).repeat(n_channels, 1, 1)
 		return img_to_hist_complex
 
