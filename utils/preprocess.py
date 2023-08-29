@@ -23,6 +23,8 @@ def random_rotate_camera(img, pose, img_size, plotter = None, rotatable = True):
 	else:
 		img = get_depth_map(plotter, position, orientation, up)
 	img = np.nan_to_num(img, nan = np.nanmax(img))
+	if np.any(np.isnan(img)):
+		img = np.zeros_like(img)
 	pose = camera_pose_to_train_pose(position, orientation, up)
 	return img, pose
 
