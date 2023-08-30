@@ -34,7 +34,7 @@ def random_rotate_camera(img, pose, img_size, plotter = None, rotatable = True):
 	pose = camera_pose_to_train_pose(position, orientation, up)
 	return img, pose
 
-def get_img_transform(data_stats_path, method, n_channels):
+def get_img_transform(data_stats_path, method, n_channels, train):
 	stats = json.load(open(data_stats_path))
 	if method in ["sfs2mesh", "mesh2sfs", "sfs", "mesh"]:
 		if method in ["sfs2mesh", "mesh"]:
@@ -51,7 +51,7 @@ def get_img_transform(data_stats_path, method, n_channels):
 		else:
 			_w, _b = 1, 0
 		def reshape_n_norm(img):
-			if method == "mesh2sfs":
+			if method == "mesh2sfs" and train:
 				img = ndimage.gaussian_filter(img, sigma = sigma, radius = radius)
 			img = torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
 			img = img * _w + _b
@@ -103,14 +103,15 @@ def get_img_transform(data_stats_path, method, n_channels):
 		return img_to_hist_complex
 	elif method == "hist_even_more_complex":
 		assert n_channels == 2
-		def img_to_hist_even_more_complex(img, bins = 30):
+		def img_to_hist_even_more_complex(img, bins = 40):
 			orig_shape = img.shape
 			if np.allclose(img.max(), img.min()):
 				img = np.zeros_like(img)
 			else:
 				img = (img - img.min()) / (img.max() - img.min())
 			jitter_sigma = 0.01
-			img = img + np.random.randn_like(img) * jitter_sigma
+			if train:
+				img = img + np.random.randn(*img.shape) * jitter_sigma
 			img_hist_indices = np.minimum(np.floor(img * bins).astype(int), bins - 1)
 			img_residual = img - img_hist_indices / bins
 			img_hist_heights = np.histogram(img.ravel(), range = (0., 1.), bins = bins, density = True)[0]
@@ -139,8 +140,10 @@ def get_img_transform(data_stats_path, method, n_channels):
 
 			res_stack = []
 			for t_channel in [final_labels, img_hist_indices]:
-				t_channel = ndimage.gaussian_filter(t_channel, sigma = sigma)
+				if train:
+					t_channel = ndimage.gaussian_filter(t_channel, sigma = sigma)
 				#t_channel = ndimage.zoom()
+				res_stack.append(t_channel)
 			
 			res = np.stack(res_stack, axis = 0)
 			#mean, std = stats["hist_complex_mean"], stats["hist_complex_std"]

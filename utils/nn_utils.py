@@ -41,11 +41,11 @@ def get_loaders_loss_metrics(args, test = False, test_set = False, single_img_se
 	if not single_img_set:
 		batch_size, ds_type = (1, TestDataset) if test and test_set else (args.batch_size, CLDataset)
 		datasets = {phase : ds_type(args.base_dir, get_dir_list(split_path), args.length, args.spacing, args.img_size, mesh_path, args.skip_prev_frame,
-			transform_img = get_img_transform(args.data_stats, preprocess, args.n_channels), transform_pose = pose_trans) for phase, split_path, preprocess, mesh_path, __ in phase_split_path}
+			transform_img = get_img_transform(args.data_stats, preprocess, args.n_channels, phase == "train"), transform_pose = pose_trans) for phase, split_path, preprocess, mesh_path, __ in phase_split_path}
 	else:
 		batch_size = args.batch_size
 		datasets = {phase : SingleImageDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, rotatable = rotate,
-			transform_img = get_img_transform(args.data_stats, preprocess, args.n_channels), transform_pose = pose_trans) for phase, split_path, preprocess, mesh_path, rotate in phase_split_path}
+			transform_img = get_img_transform(args.data_stats, preprocess, args.n_channels, phase == "train"), transform_pose = pose_trans) for phase, split_path, preprocess, mesh_path, rotate in phase_split_path}
 
 	dataloaders = {phase : DataLoader(ds, batch_size = batch_size,
 		num_workers = args.num_workers, shuffle = phase == "train") for phase, ds in datasets.items()}
