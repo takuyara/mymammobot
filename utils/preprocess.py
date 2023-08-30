@@ -12,16 +12,15 @@ from utils.misc import randu_gen
 from utils.pose_utils import compute_rotation_quaternion, get_3dof_quat, revert_quat, camera_pose_to_train_pose
 from utils.geometry import rotate_single_vector, arbitrary_perpendicular_vector
 
-def random_rotate_camera(img, pose, img_size, plotter = None, rotatable = True, zoom_scale = 1.0):
+def random_rotate_camera(img, pose, img_size, plotter = None, deg = 0, zoom_scale = 1.0):
 	position, orientation = pose[0, ...], pose[1, ...]
-	if rotatable:
-		deg = np.random.rand() * 360
+	if deg != 0 or len(pose) < 3:
 		up = rotate_single_vector(arbitrary_perpendicular_vector(orientation), orientation, deg)
 	else:
-		deg = 0
 		up = pose[2, ...]
 	if plotter is None:
-		img = rotate_and_crop(img, deg, img_size)
+		#img = rotate_and_crop(img, deg, img_size)
+		assert deg == 0
 	else:
 		img = get_depth_map(plotter, position, orientation, up, zoom = zoom_scale)
 	img = np.nan_to_num(img, nan = 200)
