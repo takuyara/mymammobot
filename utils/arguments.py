@@ -17,7 +17,7 @@ def get_base_parser(parser):
 	parser.add_argument("-d", "--device", type = str, default = "cuda", help = "The GPU device name.")
 	parser.add_argument("--save-path", type = str, default = "./checkpoints", help = "The base directory to save weights file.")
 	parser.add_argument("--data-stats", type = str, default = "./data_stats.json", help = "The pose metadata file. Should contain mean and std for rotation and quaternion.")
-	parser.add_argument("--loss-fun", type = str, default = "l2", choices = ["l1", "l2", "l2_trans"], help = "The loss function.")
+	parser.add_argument("--loss-fun", type = str, default = "l2", choices = ["l1", "l2", "l2_trans", "balanced_l1"], help = "The loss function.")
 	parser.add_argument("--hispose-noise", type = float, default = 0, help = "The noise added to previous poses.")
 	parser.add_argument("--skip-prev-frame", action = "store_true", default = False, help = "Whether the history starts at i-1 or i-K when encoding i.")
 	parser.add_argument("--model-sel-metric", type = str, choices = ["loss", "trans_err", "rot_err", "comb_err"], default = "comb_err", help = "The model selection metric.")

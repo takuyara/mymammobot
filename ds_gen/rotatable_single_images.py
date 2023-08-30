@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from utils.misc import randu_gen
 from utils.cl_utils import load_all_cls, get_unique_cl_indices, get_direction_dist_radius, index2point
 from utils.geometry import arbitrary_perpendicular_vector, rotate_single_vector
-from ds_gen.depth_map_generation import get_zoomed_plotter, get_depth_map
+from ds_gen.depth_map_generation import get_zoomed_plotter, get_depth_map, is_camera_in_bounds
 from ds_gen.camera_features import static_radial_offset_gen, static_focal_radial_offset_gen, camera_params
 
 def rotate_and_crop(img, deg, img_size):

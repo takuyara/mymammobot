@@ -1,5 +1,21 @@
 import numpy as np
+import torch
+from torch import nn
+
 from utils.pose_utils import quat_angular_error, revert_quat
+
+class BalancedL1Loss(nn.Module):
+	def __init__(self):
+		super(BalancedL1Loss, self).__init__()
+		self._beta = nn.Parameter(torch.tensor(0))
+		self._gamma = nn.Parameter(torch.tensor(0))
+		self.base_loss = nn.L1Loss()
+
+	def forward(self, inputs, targets):
+		trans_loss = self.base_loss(inputs[..., : 3], targets[..., : 3])
+		rot_loss = self.base_loss(inputs[..., 3 : ], targets[..., 3 : ])
+		loss = trans_loss * torch.exp(-self._beta) + rot_loss * torch.exp(-self._gamma) + self._beta + self._gamma
+		return loss
 
 class Metrics:
 	def __init__(self, loss_fun, inv_trans, main_metric, rot_coef = None):
@@ -40,4 +56,7 @@ class Metrics:
 		}
 	def __repr__(self):
 		dct = self.get_dict()
-		return "loss: {:.5f}; trans_error: {:.2f}, {:.2f}; rot_error: {:.2f}, {:.2f}".format(dct["loss"], dct["translation_error"], dct["translation_error_std"], dct["rotation_error"], dct["rotation_error_std"])
+		repr_str = "loss: {:.5f}; trans_error: {:.2f}, {:.2f}; rot_error: {:.2f}, {:.2f}".format(dct["loss"], dct["translation_error"], dct["translation_error_std"], dct["rotation_error"], dct["rotation_error_std"])
+		if isinstance(self.loss_fun, BalancedL1Loss):
+			repr_str = repr_str + f" beta: {self.loss_fun._beta.item()}, gamma: {self.loss_fun._gamma.item()}"
+		return repr_str

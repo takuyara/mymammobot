@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from domain_transfer.transformation import get_simple_loaders, SFS2Mesh, Mesh2SFS
+from utils.preprocess import get_img_transform
 
 def plot_one_batch(model, test_dloader, device):
 	for sfs_imgs, mesh_imgs in test_dloader:
@@ -32,6 +33,7 @@ def main():
 	paired_paths = []
 	rd_min = vd_min = 1e10
 	rd_max = vd_max = -1e10
+	hist_complex_fun = get_img_transform("./data_stats.json", "hist_complex", 1)
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
 		for row in reader:
@@ -47,6 +49,15 @@ def main():
 					print(f"Virtual not found: {em_idx}, {try_idx}, {img_idx}.")
 					continue
 				rd, vd = np.load(real_depth_path), np.load(virtual_depth_path)
+				rd, vd = hist_complex_fun(rd).squeeze().numpy(), hist_complex_fun(vd).squeeze().numpy()
+				plt.subplot(1, 2, 1)
+				plt.imshow(rd)
+				plt.colorbar()
+				plt.subplot(1, 2, 2)
+				plt.imshow(vd)
+				plt.colorbar()
+				plt.suptitle(f"{np.mean((rd - vd) ** 2):.4f}")
+				plt.show()
 				rd_min, rd_max = min(rd_min, rd.min()), max(rd_max, rd.max())
 				vd_min, vd_max = min(vd_min, vd.min()), max(vd_max, vd.max())
 	print("Everything found: ", len(paired_paths))

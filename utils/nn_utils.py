@@ -5,7 +5,7 @@ from torchvision import models
 from torch.utils.data import DataLoader
 
 from utils.file_utils import get_dir_list
-from utils.reg_metrics import Metrics
+from utils.reg_metrics import Metrics, BalancedL1Loss
 from utils.preprocess import get_img_transform, get_pose_transforms
 
 from datasets.cl_dataset import CLDataset, TestDataset
@@ -25,6 +25,8 @@ def get_loss_fun(args):
 		return nn.MSELoss()
 	elif args.loss_fun == "l2_trans":
 		return l2_trans_loss
+	elif args.loss_fun == "balanced_l1":
+		return BalancedL1Loss()
 	else:
 		raise NotImplementedError
 

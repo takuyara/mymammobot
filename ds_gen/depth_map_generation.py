@@ -21,6 +21,23 @@ def get_depth_map(
 	else:
 		return -p.get_image_depth()
 
+def is_camera_in_bounds(
+	p, position, orientation, up,
+	zoom = 1.0, focal_length = camera_params["focal_length"],
+	view_angle = camera_params["view_angle"], clipping_range = camera_params["clipping_range"]
+	):
+	camera = pv.Camera()
+	camera.position = position
+	camera.focal_point = position + focal_length * orientation
+	camera.up = up
+	camera.view_angle = view_angle
+	camera.clipping_range = clipping_range
+	camera.zoom(zoom)
+	p.camera = camera
+	p.show(auto_close = False)
+	img = p.screenshot(None, return_img = True)
+	return not np.isclose(np.max(np.min(img, axis = -1)), 255)
+
 def get_zoomed_plotter(img_size, zoom_scale, orig_view_angle = camera_params["view_angle"]):
 	half_angle = np.deg2rad(orig_view_angle / 2)
 	size_change_rate = np.tan(half_angle / zoom_scale) / np.tan(half_angle)

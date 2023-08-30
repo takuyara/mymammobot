@@ -18,13 +18,12 @@ def load_cl(base_path, cl_idx):
 	radiuses.reverse()
 	return np.array(points), np.array(radiuses)
 
-def load_all_cls(base_path, n_cls = 100):
+def load_all_cls(base_path, n_cls = 50):
 	all_cls = []
 	for cl_idx in range(n_cls):
 		points, radiuses = load_cl(base_path, cl_idx)
-		if points is None:
-			break
-		all_cls.append((points, radiuses))
+		if points is not None:
+			all_cls.append((points, radiuses))
 	return all_cls
 
 def locate_on_cl(x, all_cls, n_candidates = 50):

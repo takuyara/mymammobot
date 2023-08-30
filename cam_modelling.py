@@ -28,7 +28,12 @@ def main():
 			#radial_norm.append(float(row["radial_velocity"]))
 			velocity_norm.append(float(row["total_velocity"]))
 
+	"""
 	plt.scatter(lumen_radius, velocity_norm)
+	plt.show()
+	"""
+
+	plt.hist(lumen_radius, bins = 30)
 	plt.show()
 
 if __name__ == '__main__':
