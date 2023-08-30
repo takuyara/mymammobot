@@ -7,6 +7,7 @@ from torch.utils.data import Dataset
 
 from utils.pose_utils import get_6dof_pose_label
 from utils.preprocess import random_rotate_camera
+from utils.misc import randu_gen
 
 class SingleImageDataset(Dataset):
 	def __init__(self, base_dir, dir_list, img_size, mesh_path, rotatable, pack_data_size = 3, transform_img = None, transform_pose = None):
@@ -20,6 +21,7 @@ class SingleImageDataset(Dataset):
 		self.transform_img, self.transform_pose = transform_img, transform_pose
 		self.img_size = img_size
 		self.rotatable = rotatable
+		self.zoom_gen = randu_gen(0.9, 1.1)
 		if mesh_path is None:
 			self.plotter = None
 		else:
@@ -36,7 +38,7 @@ class SingleImageDataset(Dataset):
 		else:
 			img = None
 		pose = np.loadtxt(os.path.join(p, f"{i:06d}.txt"))
-		img, pose = random_rotate_camera(img, pose, self.img_size, self.plotter, self.rotatable)
+		img, pose = random_rotate_camera(img, pose, self.img_size, self.plotter, self.rotatable, zoom = self.zoom_gen())
 		pose = get_6dof_pose_label(pose)
 		
 		if self.transform_img is not None:

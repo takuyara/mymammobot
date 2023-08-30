@@ -4,6 +4,7 @@ import torch
 from torch import optim
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from domain_transfer.transformation import get_simple_loaders, SFS2Mesh, Mesh2SFS
 from utils.preprocess import get_img_transform
@@ -33,10 +34,12 @@ def main():
 	paired_paths = []
 	rd_min = vd_min = 1e10
 	rd_max = vd_max = -1e10
-	hist_complex_fun = get_img_transform("./data_stats.json", "quantile", 1, False)
+	hist_complex_fun = get_img_transform("./data_stats.json", "hist_simple", 1, False)
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
-		for row in reader:
+		rd_sum, rd_cnt, vd_sum, vd_cnt = np.zeros(40), np.zeros(40), np.zeros(40), np.zeros(40)
+		errs, range_rates = [], []
+		for row in tqdm(reader):
 			if row["interp"] == "0" and row["human_eval"] == "1":
 				em_idx, img_idx, try_idx = int(row["em_idx"]), int(row["img_idx"]), int(row["try_idx"])
 				real_depth_path = os.path.join("depth-images", f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy")
@@ -49,13 +52,19 @@ def main():
 					print(f"Virtual not found: {em_idx}, {try_idx}, {img_idx}.")
 					continue
 				rd, vd = np.load(real_depth_path), np.load(virtual_depth_path)
-				rd, vd = hist_complex_fun(rd).squeeze().numpy(), hist_complex_fun(vd).squeeze().numpy()
-				err = np.abs(rd - vd)
+				vd = np.clip(vd, 0, 50)
+				rd_t, vd_t = hist_complex_fun(rd).squeeze().numpy(), hist_complex_fun(vd).squeeze().numpy()
+				err = np.abs(rd_t - vd_t)
+				range_rate = (vd.max() - vd.min()) / (rd.max() - rd.min())
+				errs.append(np.mean(err))
+				range_rates.append(range_rate)
+
+				"""
 				plt.subplot(1, 3, 1)
-				plt.imshow(rd)
+				plt.imshow(rd_t)
 				plt.colorbar()
 				plt.subplot(1, 3, 2)
-				plt.imshow(vd)
+				plt.imshow(vd_t)
 				plt.colorbar()
 				plt.subplot(1, 3, 3)
 				plt.imshow(err)
@@ -64,6 +73,18 @@ def main():
 				plt.show()
 				rd_min, rd_max = min(rd_min, rd.min()), max(rd_max, rd.max())
 				vd_min, vd_max = min(vd_min, vd.min()), max(vd_max, vd.max())
+				"""
+				"""
+				rd_idx, vd_idx = np.round(rd_idx * 40), np.round(vd_idx * 40)
+				for i in range(40):
+					idx = np.where(rd_idx == i)
+				"""
+
+	plt.scatter(range_rates, errs)
+	print("Mean err = ", np.mean(errs))
+	plt.show()
+	exit()
+
 	print("Everything found: ", len(paired_paths))
 	print(f"RD: ({rd_min:.2f}, {rd_max:.2f}), VD: ({vd_min:.2f}, {vd_max:.2f}).")
 	device = "cuda"
