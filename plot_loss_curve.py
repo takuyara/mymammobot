@@ -6,7 +6,7 @@ def get_error(s, p):
 	return float(s)
 
 train_err, val_err = [], []
-with open("slurm20-92869.out") as f:
+with open("slurm20-92939.out") as f:
 	for s in f.readlines():
 		if s.find("train done") != -1:
 			te, re = get_error(s, "trans_error: "), get_error(s, "rot_error: ")
