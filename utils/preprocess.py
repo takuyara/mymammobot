@@ -3,10 +3,11 @@ import torch
 import numpy as np
 from torchvision import transforms
 from scipy.spatial.transform import Rotation as R
-from scipy.ndimage import gaussian_filter
+from scipy import ndimage
 
 from ds_gen.rotatable_single_images import rotate_and_crop
 from ds_gen.depth_map_generation import get_depth_map
+from utils.misc import randu_gen
 from utils.pose_utils import compute_rotation_quaternion, get_3dof_quat, revert_quat, camera_pose_to_train_pose
 from utils.geometry import rotate_single_vector, arbitrary_perpendicular_vector
 
@@ -51,7 +52,7 @@ def get_img_transform(data_stats_path, method, n_channels):
 			_w, _b = 1, 0
 		def reshape_n_norm(img):
 			if method == "mesh2sfs":
-				img = gaussian_filter(img, sigma = sigma, radius = radius)
+				img = ndimage.gaussian_filter(img, sigma = sigma, radius = radius)
 			img = torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
 			img = img * _w + _b
 			img = (img - img_mean) / img_std
@@ -108,6 +109,8 @@ def get_img_transform(data_stats_path, method, n_channels):
 				img = np.zeros_like(img)
 			else:
 				img = (img - img.min()) / (img.max() - img.min())
+			jitter_sigma = 0.01
+			img = img + np.random.randn_like(img) * jitter_sigma
 			img_hist_indices = np.minimum(np.floor(img * bins).astype(int), bins - 1)
 			img_residual = img - img_hist_indices / bins
 			img_hist_heights = np.histogram(img.ravel(), range = (0., 1.), bins = bins, density = True)[0]
@@ -130,13 +133,16 @@ def get_img_transform(data_stats_path, method, n_channels):
 			img_hist_indices = img_hist_indices.reshape(orig_shape)
 
 			kernel_size = stats["mesh2sfs_kernel"]
-			radius = (kernel_size - 1) // 2
-			sigma = 0.3 * ((kernel_size - 1) * 0.5 - 1) + 0.8
+			sigma = randu_gen(0.1, 2.3)()
+			#centre_shift = randu_gen(0, 10)()
+			#zoom = randu_gen(0.8, 1.2)()
 
-			final_labels = gaussian_filter(final_labels, sigma = sigma, radius = radius)
-			img_hist_indices = gaussian_filter(img_hist_indices, sigma = sigma, radius = radius)
-
-			res = np.stack([final_labels, img_hist_indices], axis = 0)
+			res_stack = []
+			for t_channel in [final_labels, img_hist_indices]:
+				t_channel = ndimage.gaussian_filter(t_channel, sigma = sigma)
+				#t_channel = ndimage.zoom()
+			
+			res = np.stack(res_stack, axis = 0)
 			#mean, std = stats["hist_complex_mean"], stats["hist_complex_std"]
 			#labels = (labels - mean) / std
 			return torch.tensor(res).float()
