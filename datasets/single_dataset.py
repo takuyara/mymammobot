@@ -38,7 +38,7 @@ class SingleImageDataset(Dataset):
 		else:
 			img = None
 		pose = np.loadtxt(os.path.join(p, f"{i:06d}.txt"))
-		img, pose = random_rotate_camera(img, pose, self.img_size, self.plotter, self.rotatable, zoom = self.zoom_gen())
+		img, pose = random_rotate_camera(img, pose, self.img_size, self.plotter, self.rotatable, zoom_scale = self.zoom_gen())
 		pose = get_6dof_pose_label(pose)
 		
 		if self.transform_img is not None:
