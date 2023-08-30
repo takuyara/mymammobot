@@ -155,6 +155,7 @@ pretrained/*
 meshes/*
 checkpoints/*
 CL
+CL1
 depth-images
 depth-images-1
 velocity_norms.npy

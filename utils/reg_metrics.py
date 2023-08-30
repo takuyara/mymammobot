@@ -7,8 +7,8 @@ from utils.pose_utils import quat_angular_error, revert_quat
 class BalancedL1Loss(nn.Module):
 	def __init__(self):
 		super(BalancedL1Loss, self).__init__()
-		self._beta = nn.Parameter(torch.tensor(0))
-		self._gamma = nn.Parameter(torch.tensor(0))
+		self._beta = nn.Parameter(torch.tensor(0.))
+		self._gamma = nn.Parameter(torch.tensor(0.))
 		self.base_loss = nn.L1Loss()
 
 	def forward(self, inputs, targets):
