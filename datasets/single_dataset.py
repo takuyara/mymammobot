@@ -18,14 +18,13 @@ class SingleImageDataset(Dataset):
 			this_dir = os.path.join(base_dir, this_dir)
 			for path in os.listdir(this_dir):
 				if path.endswith(".txt"):
-					if self.rotatable:
+					if rotatable:
 						degrees = [angle_gen() for __ in range(5)]
 					else:
 						degrees = [0]
 					self.samples.extend([(this_dir, int(path.replace(".txt", "")), deg) for deg in degrees])
 		self.transform_img, self.transform_pose = transform_img, transform_pose
 		self.img_size = img_size
-		self.rotatable = rotatable
 		#self.zoom_gen = randu_gen(0.9, 1.1)
 		self.zoom_gen = lambda : 1
 		if mesh_path is None:
