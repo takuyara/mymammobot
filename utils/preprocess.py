@@ -100,6 +100,47 @@ def get_img_transform(data_stats_path, method, n_channels):
 			#labels = (labels - mean) / std
 			return torch.tensor(labels).float().unsqueeze(0).repeat(n_channels, 1, 1)
 		return img_to_hist_complex
+	elif method == "hist_even_more_complex":
+		assert n_channels == 2
+		def img_to_hist_even_more_complex(img, bins = 30):
+			orig_shape = img.shape
+			if np.allclose(img.max(), img.min()):
+				img = np.zeros_like(img)
+			else:
+				img = (img - img.min()) / (img.max() - img.min())
+			img_hist_indices = np.minimum(np.floor(img * bins).astype(int), bins - 1)
+			img_residual = img - img_hist_indices / bins
+			img_hist_heights = np.histogram(img.ravel(), range = (0., 1.), bins = bins, density = True)[0]
+			hist_peak_idx = np.argmax(img_hist_heights)
+			img_hist_heights = img_hist_heights / img_hist_heights[hist_peak_idx]
+			#print("Prev: ", [round(x, 1) for x in img_hist_heights])
+			for j in range(len(img_hist_heights)):
+				i = len(img_hist_heights) - j - 1
+				if i < hist_peak_idx:
+					#img_hist_heights[i] += 1
+					img_hist_heights[i] = 1
+				if j > 0:
+					img_hist_heights[i] = max(img_hist_heights[i], img_hist_heights[i + 1])
+			#print("Succ: ", [round(x, 1) for x in img_hist_heights])
+			labels_l = img_hist_heights[img_hist_indices]
+			img_hist_heights_extended = np.concatenate([img_hist_heights, np.array([img_hist_heights[-1]])], axis = 0)
+			labels_r = img_hist_heights_extended[img_hist_indices + 1]
+			final_labels = labels_l * img_residual + labels_r * (1 - img_residual)
+			final_labels = final_labels.reshape(orig_shape)
+			img_hist_indices = img_hist_indices.reshape(orig_shape)
+
+			kernel_size = stats["mesh2sfs_kernel"]
+			radius = (kernel_size - 1) // 2
+			sigma = 0.3 * ((kernel_size - 1) * 0.5 - 1) + 0.8
+
+			final_labels = gaussian_filter(final_labels, sigma = sigma, radius = radius)
+			img_hist_indices = gaussian_filter(img_hist_indices, sigma = sigma, radius = radius)
+
+			res = np.stack([final_labels, img_hist_indices], axis = 0)
+			#mean, std = stats["hist_complex_mean"], stats["hist_complex_std"]
+			#labels = (labels - mean) / std
+			return torch.tensor(res).float()
+		return img_to_hist_even_more_complex
 
 def get_pose_transforms(data_stats_path, hispose_noise, modality):
 	stats = json.load(open(data_stats_path))

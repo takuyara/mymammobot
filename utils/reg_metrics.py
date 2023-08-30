@@ -58,5 +58,5 @@ class Metrics:
 		dct = self.get_dict()
 		repr_str = "loss: {:.5f}; trans_error: {:.2f}, {:.2f}; rot_error: {:.2f}, {:.2f}".format(dct["loss"], dct["translation_error"], dct["translation_error_std"], dct["rotation_error"], dct["rotation_error_std"])
 		if isinstance(self.loss_fun, BalancedL1Loss):
-			repr_str = repr_str + f" beta: {self.loss_fun._beta.item()}, gamma: {self.loss_fun._gamma.item()}"
+			repr_str = repr_str + f" beta: {self.loss_fun._beta.item():.4f}, gamma: {self.loss_fun._gamma.item():.4f}"
 		return repr_str
