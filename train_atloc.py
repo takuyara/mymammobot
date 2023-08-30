@@ -35,7 +35,7 @@ def main():
 	args = get_args("atloc")
 	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, single_img_set = True)
 	model, device = get_models(args, "atloc")
-	optimiser = optim.Adam(model.parameters(), lr = args.learning_rate)
+	optimiser = optim.Adam([p for p in model.parameters()] + [p for p in loss_fun.parameters()], lr = args.learning_rate)
 	min_loss, min_epoch, best_state_dict = train_val(model, dataloaders, optimiser, args.epochs, loss_fun, metric_template, device)
 	torch.save(best_state_dict, os.path.join(args.save_path, f"atloc_{min_loss:.5f}.pth"))
 
