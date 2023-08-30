@@ -33,7 +33,7 @@ def main():
 	paired_paths = []
 	rd_min = vd_min = 1e10
 	rd_max = vd_max = -1e10
-	hist_complex_fun = get_img_transform("./data_stats.json", "hist_complex", 1)
+	hist_complex_fun = get_img_transform("./data_stats.json", "quantile", 1, False)
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
 		for row in reader:

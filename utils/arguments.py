@@ -41,6 +41,7 @@ def get_atloc_parser(parser):
 	parser.add_argument("--atloc-base", type = str, default = "resnet34", choices = ["resnet18", "resnet34", "resnet50"])
 	parser.add_argument("--dropout", type = float, default = 0.5, help = "The dropout rate for AtLoc.")
 	parser.add_argument("--img-encode-dim", type = int, default = 2048, help = "The feature dim for AtLoc.")
+	parser.add_argument("--uses-posenet", action = "store_true", default = False)
 	return parser
 
 def get_hisenc_parser(parser):

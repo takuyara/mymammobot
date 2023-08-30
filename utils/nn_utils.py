@@ -10,7 +10,7 @@ from utils.preprocess import get_img_transform, get_pose_transforms
 
 from datasets.cl_dataset import CLDataset, TestDataset
 from datasets.single_dataset import SingleImageDataset
-from models.atloc import AtLoc
+from models.atloc import AtLoc, PoseNet
 from models.fuser import LSTMFuser
 from models.fuse_predictor import MLPFusePredictor
 from models.selector import MLPSelector
@@ -65,7 +65,10 @@ def get_models(args, *names):
 				base = models.resnet34(weights = models.ResNet34_Weights.DEFAULT)
 			elif args.atloc_base == "resnet50":
 				base = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
-			model = AtLoc(base, droprate = args.dropout, feat_dim = args.img_encode_dim, n_channels = args.n_channels).to(device)
+			if args.uses_posenet:
+				model = PoseNet(base, droprate = args.dropout, n_channels = args.n_channels).to(device)
+			else:
+				model = AtLoc(base, droprate = args.dropout, feat_dim = args.img_encode_dim, n_channels = args.n_channels).to(device)
 			if t_name.endswith("+"):
 				model.load_state_dict(torch.load(os.path.join(args.save_path, args.atloc_path)))
 		elif t_name.startswith("hisenc"):

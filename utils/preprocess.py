@@ -66,6 +66,11 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			q = np.argsort(q)
 			q = q / len(q)
 			q = q.reshape(orig_shape)
+			if train:
+				sigma_blur = randu_gen(0.1, 2.3)()
+				sigma_intensity = 0.01
+				q = q + np.random.randn(*q.shape) * sigma_intensity
+				q = ndimage.gaussian_filter(q, sigma = sigma_blur)
 			q = torch.tensor(q).float().unsqueeze(0).repeat(n_channels, 1, 1)
 			return q
 		return img_to_quantile
