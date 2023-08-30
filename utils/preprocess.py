@@ -93,7 +93,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			q = torch.tensor(q).float().unsqueeze(0).repeat(n_channels, 1, 1)
 			q = ts(q)
 			return q
-		return img_to_quantile
+		return img_to_quantile_sfs
 	elif method == "hist_simple":
 		def img_to_hist_simple(img, bins = 30):
 			img = (img - img.min()) / (img.max() - img.min())
