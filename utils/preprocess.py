@@ -73,7 +73,6 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 				q = q + np.random.randn(*q.shape) * sigma_intensity
 				q = ndimage.gaussian_filter(q, sigma = sigma_blur)
 			q = torch.tensor(q).float().unsqueeze(0).repeat(n_channels, 1, 1)
-			q = (q - 0.5) / 0.29
 			return q
 		return img_to_quantile
 	elif method == "quantile_sfs":
@@ -93,7 +92,6 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 				q = ndimage.gaussian_filter(q, sigma = sigma_blur)
 			q = torch.tensor(q).float().unsqueeze(0).repeat(n_channels, 1, 1)
 			q = ts(q)
-			q = (q - 0.5) / 0.29
 			return q
 		return img_to_quantile_sfs
 	elif method == "hist_simple":
