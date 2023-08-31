@@ -97,7 +97,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			img = torch.tensor(img).float().unsqueeze(0)
 			if method == "mesh2sfs":
 				img = transforms.GaussianBlur(21, 7)(img)
-			img = torch.minimum(img, _c) * _w + _b
+			img = torch.minimum(img, torch.tensor(_c)) * _w + _b
 			img = (img - img_mean) / img_std
 			return img.repeat(n_channels, 1, 1)
 		return reshape_n_norm
