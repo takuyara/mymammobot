@@ -19,7 +19,7 @@ class SingleImageDataset(Dataset):
 			for path in os.listdir(this_dir):
 				if path.endswith(".txt"):
 					if rotatable:
-						degrees = [angle_gen() for __ in range(5)]
+						degrees = [angle_gen() for __ in range(4)]
 					else:
 						degrees = [0]
 					self.samples.extend([(this_dir, int(path.replace(".txt", "")), deg) for deg in degrees])
