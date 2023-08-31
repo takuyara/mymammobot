@@ -57,8 +57,10 @@ class Mesh2SFS(nn.Module):
 		super(Mesh2SFS, self).__init__()
 		self.sfs_min, self.sfs_max = sfs_min, sfs_max
 		self.mesh_min, self.mesh_max = mesh_min, mesh_max
-		self._w = nn.Parameter(torch.tensor(1.))
-		self._b = nn.Parameter(torch.tensor(0.))
+		#self._w = nn.Parameter(torch.tensor(1.))
+		self._w = nn.Parameter(torch.tensor(0.13236457109451294))
+		#self._b = nn.Parameter(torch.tensor(0.))
+		self._b = nn.Parameter(torch.tensor(2.5300467014312744))
 		self.blur_kernel = blur_kernel
 		self.gamma = gamma
 		self.clip = clip

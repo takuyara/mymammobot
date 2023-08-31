@@ -114,7 +114,8 @@ def main():
 					sum_loss += loss.item() * sfs_imgs.size(0)
 					num_loss += sfs_imgs.size(0)
 			print(f"Epoch: {epoch} {phase} loss = {sum_loss / num_loss :.4f}")
+		print(model._w.item(), model._b.item())
 	#plot_one_batch(model, test_dloader, device)
-	print(model._w.item(), model._b.item())
+	
 if __name__ == '__main__':
 	main()

@@ -90,13 +90,13 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			_w, _b = stats["sfs2mesh_weight"], stats["sfs2mesh_bias"]
 		elif method == "mesh2sfs":
 			#_w, _b = stats["mesh2sfs_weight"], stats["mesh2sfs_bias"]
-			_w, _b = 1, 0
+			_w, _b = 0.13236457109451294, 2.5300467014312744
 		else:
 			_w, _b = 1, 0
 		def reshape_n_norm(img):
 			img = torch.tensor(img).float().unsqueeze(0)
 			if method == "mesh2sfs":
-				img = transforms.GaussianBlur(21, 8)(img)
+				img = transforms.GaussianBlur(21, 7)(img)
 			img = img * _w + _b
 			img = (img - img_mean) / img_std
 			return img.repeat(n_channels, 1, 1)
@@ -147,7 +147,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 	elif method == "hist_simple_blur":
 		def img_to_hist_simple_blur(img, bins = 30):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 8)(img)
+			img = transforms.GaussianBlur(21, 7)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = torch.floor(img * bins) / bins
 			return img.repeat(n_channels, 1, 1)
@@ -161,14 +161,14 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 	elif method == "hist_accurate_blur":
 		def img_to_hist_accurate_blur(img):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 8)(img)
+			img = transforms.GaussianBlur(21, 7)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			return img.repeat(n_channels, 1, 1)
 		return img_to_hist_accurate_blur
 	elif method == "small_01_blur":
 		def fun(img):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 8)(img)
+			img = transforms.GaussianBlur(21, 7)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
 			img = transforms.Resize(112)(img)
