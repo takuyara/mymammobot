@@ -158,7 +158,9 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			if train:
 				img = img + np.random.randn(*img.shape) * 0.2
 			"""
-			return torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
+			img = torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
+			img = transforms.GaussianBlur(13)(img)
+			return img
 		return img_to_hist_accurate
 	elif method == "hist_complex":
 		def img_to_hist_complex(img, bins = 30):
