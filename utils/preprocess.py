@@ -143,6 +143,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 		def img_to_hist_simple(img, bins = 30):
 			img = np.clip(img, 0, 35)
 			img = (img - img.min()) / (img.max() - img.min())
+			img = img + np.randn(*img.shape) * 0.2
 			img = np.floor(img * bins) / bins
 			return torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
 		return img_to_hist_simple
