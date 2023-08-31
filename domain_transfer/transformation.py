@@ -58,13 +58,11 @@ class Mesh2SFS(nn.Module):
 		self.sfs_min, self.sfs_max = sfs_min, sfs_max
 		self.mesh_min, self.mesh_max = mesh_min, mesh_max
 		#self._w = nn.Parameter(torch.tensor(1.))
-		self._w = nn.Parameter(torch.tensor(0.13236457109451294))
+		self._w = nn.Parameter(torch.tensor(0.10947444289922714))
 		#self._b = nn.Parameter(torch.tensor(0.))
-		self._b = nn.Parameter(torch.tensor(2.5300467014312744))
-		self.blur_kernel = blur_kernel
-		self.gamma = gamma
-		self.clip = clip
-
+		self._b = nn.Parameter(torch.tensor(2.88663911819458))
+		#self._c = nn.Parameter(torch.tensor(50.))
+		self._c = nn.Parameter(torch.tensor(48.91801452636719))
 	def forward(self, sfs_img, mesh_img):
 		initial_shape = sfs_img.shape
 		sfs_img, mesh_img = sfs_img.unsqueeze(1), mesh_img.unsqueeze(1)
@@ -75,6 +73,6 @@ class Mesh2SFS(nn.Module):
 		#mesh_img = F.adjust_gamma(mesh_img, gamma = self.gamma)
 		#mesh_img = F.gaussian_blur(mesh_img, kernel_size = self.blur_kernel)
 		sfs_img_f, mesh_img_f = sfs_img.reshape(sfs_img.size(0), -1), mesh_img.reshape(mesh_img.size(0), -1)
-		mesh_solved_f = self._w * mesh_img_f + self._b
+		mesh_solved_f = self._w * torch.minimum(self._c, mesh_img_f) + self._b
 		loss = nn.MSELoss()(sfs_img_f, mesh_solved_f)
 		return loss, mesh_solved_f.reshape(*initial_shape)

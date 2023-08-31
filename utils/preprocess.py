@@ -87,17 +87,17 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 		else:
 			img_mean, img_std = stats["sfs_mean"], stats["sfs_std"]
 		if method == "sfs2mesh":
-			_w, _b = stats["sfs2mesh_weight"], stats["sfs2mesh_bias"]
+			_w, _b, _c = stats["sfs2mesh_weight"], stats["sfs2mesh_bias"], 20
 		elif method == "mesh2sfs":
 			#_w, _b = stats["mesh2sfs_weight"], stats["mesh2sfs_bias"]
-			_w, _b = 0.13236457109451294, 2.5300467014312744
+			_w, _b, _c = 0.11266942322254181, 2.890545129776001, 48.7679443359375
 		else:
-			_w, _b = 1, 0
+			_w, _b, _c = 1, 0, 1e4
 		def reshape_n_norm(img):
 			img = torch.tensor(img).float().unsqueeze(0)
 			if method == "mesh2sfs":
 				img = transforms.GaussianBlur(21, 7)(img)
-			img = img * _w + _b
+			img = torch.minimum(img, _c) * _w + _b
 			img = (img - img_mean) / img_std
 			return img.repeat(n_channels, 1, 1)
 		return reshape_n_norm

@@ -81,8 +81,8 @@ def main():
 				plt.show()
 				rd_min, rd_max = min(rd_min, rd.min()), max(rd_max, rd.max())
 				vd_min, vd_max = min(vd_min, vd.min()), max(vd_max, vd.max())
-				
 				"""
+				
 
 	"""
 	plt.scatter(range_rates, errs)
@@ -98,10 +98,15 @@ def main():
 	model = Mesh2SFS(rd_min, rd_max, vd_min, vd_max).to(device)
 	#model = Mesh2SFS(rd_min, rd_max, vd_min, vd_max).to(device)
 	optimiser = optim.Adam(model.parameters(), lr = 1e-3)
+
 	#plot_one_batch(model, test_dloader, device)
 	for epoch in range(20):
 		#print(model.contrast_factor.item())
 		for phase, dloader in [("train", train_dloader), ("test", test_dloader)]:
+			if phase == "train":
+				model.train()
+			else:
+				model.eval()
 			with torch.set_grad_enabled(phase == "train"):
 				sum_loss, num_loss = 0, 0
 				for sfs_imgs, mesh_imgs in dloader:
@@ -114,7 +119,7 @@ def main():
 					sum_loss += loss.item() * sfs_imgs.size(0)
 					num_loss += sfs_imgs.size(0)
 			print(f"Epoch: {epoch} {phase} loss = {sum_loss / num_loss :.4f}")
-		print(model._w.item(), model._b.item())
+		print(model._w.item(), model._b.item(), model._c.item())
 	#plot_one_batch(model, test_dloader, device)
 	
 if __name__ == '__main__':
