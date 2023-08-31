@@ -4,6 +4,13 @@ from torch import nn
 
 from utils.pose_utils import quat_angular_error, revert_quat
 
+class TransL2Loss(nn.Module):
+	def __init__(self):
+		super(TransL2Loss, self).__init__()
+		self.base_loss = nn.MSELoss()
+	def forward(self, inp, tgt):
+		return self.base_loss(inp[..., : 3], tgt[..., : 3])
+
 class BalancedL1Loss(nn.Module):
 	def __init__(self):
 		super(BalancedL1Loss, self).__init__()

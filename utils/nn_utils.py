@@ -5,7 +5,7 @@ from torchvision import models
 from torch.utils.data import DataLoader
 
 from utils.file_utils import get_dir_list
-from utils.reg_metrics import Metrics, BalancedL1Loss
+from utils.reg_metrics import Metrics, BalancedL1Loss, TransL2Loss
 from utils.preprocess import get_img_transform, get_pose_transforms
 
 from datasets.cl_dataset import CLDataset, TestDataset
@@ -15,16 +15,13 @@ from models.fuser import LSTMFuser
 from models.fuse_predictor import MLPFusePredictor
 from models.selector import MLPSelector
 
-def l2_trans_loss(inp, tgt):
-	return nn.MSELoss()(inp[..., : 3], tgt[..., : 3])
-
 def get_loss_fun(args):
 	if args.loss_fun == "l1":
 		return nn.L1Loss()
 	elif args.loss_fun == "l2":
 		return nn.MSELoss()
 	elif args.loss_fun == "l2_trans":
-		return l2_trans_loss
+		return TransL2Loss()
 	elif args.loss_fun == "balanced_l1":
 		return BalancedL1Loss()
 	else:
