@@ -5,6 +5,7 @@ from torch.utils.data import Dataset, DataLoader
 #from kornia.enhance import sharpness, adjust_contrast
 #from kornia.filters import gaussian_blur2d
 import torchvision.transforms.functional as F
+from torchvision import transforms
 from sklearn.model_selection import train_test_split
 
 class SimpleDataset(Dataset):
@@ -65,11 +66,12 @@ class Mesh2SFS(nn.Module):
 	def forward(self, sfs_img, mesh_img):
 		initial_shape = sfs_img.shape
 		sfs_img, mesh_img = sfs_img.unsqueeze(1), mesh_img.unsqueeze(1)
+		mesh_img = transforms.GaussianBlur(21, 7)(mesh_img)
 		#mesh_img = (mesh_img - self.mesh_min) / (self.mesh_max - self.mesh_min)
 		#mesh_img = (mesh_img - self.mesh_min) / (self.clip - self.mesh_min)
 		#mesh_img = torch.clamp(mesh_img, 0, 1)
 		#mesh_img = F.adjust_gamma(mesh_img, gamma = self.gamma)
-		mesh_img = F.gaussian_blur(mesh_img, kernel_size = self.blur_kernel)
+		#mesh_img = F.gaussian_blur(mesh_img, kernel_size = self.blur_kernel)
 		sfs_img_f, mesh_img_f = sfs_img.reshape(sfs_img.size(0), -1), mesh_img.reshape(mesh_img.size(0), -1)
 		mesh_solved_f = self._w * mesh_img_f + self._b
 		loss = nn.MSELoss()(sfs_img_f, mesh_solved_f)

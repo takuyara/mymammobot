@@ -89,19 +89,17 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 		if method == "sfs2mesh":
 			_w, _b = stats["sfs2mesh_weight"], stats["sfs2mesh_bias"]
 		elif method == "mesh2sfs":
-			_w, _b = stats["mesh2sfs_weight"], stats["mesh2sfs_bias"]
-			kernel_size = stats["mesh2sfs_kernel"]
-			radius = (kernel_size - 1) // 2
-			sigma = 0.3 * ((kernel_size - 1) * 0.5 - 1) + 0.8
+			#_w, _b = stats["mesh2sfs_weight"], stats["mesh2sfs_bias"]
+			_w, _b = 1, 0
 		else:
 			_w, _b = 1, 0
 		def reshape_n_norm(img):
-			if method == "mesh2sfs" and train:
-				img = ndimage.gaussian_filter(img, sigma = sigma, radius = radius)
-			img = torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
+			img = torch.tensor(img).float().unsqueeze(0)
+			if method == "mesh2sfs":
+				img = transforms.GaussianBlur(21, 8)(img)
 			img = img * _w + _b
 			img = (img - img_mean) / img_std
-			return img			
+			return img.repeat(n_channels, 1, 1)
 		return reshape_n_norm
 	elif method == "quantile":
 		def img_to_quantile(img):
@@ -173,7 +171,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			img = transforms.GaussianBlur(21, 8)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
-			img = transforms.Resize(112)
+			img = transforms.Resize(112)(img)
 			return img
 		return fun
 	elif method == "small_01":
@@ -181,7 +179,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			img = torch.tensor(img).float().unsqueeze(0)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
-			img = transforms.Resize(112)
+			img = transforms.Resize(112)(img)
 			return img
 		return fun
 	elif method == "hist_complex":

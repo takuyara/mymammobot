@@ -54,6 +54,8 @@ def main():
 				if not os.path.exists(virtual_depth_path):
 					print(f"Virtual not found: {em_idx}, {try_idx}, {img_idx}.")
 					continue
+
+				"""
 				rd, vd = np.load(real_depth_path), np.load(virtual_depth_path)
 
 				vd_ = transforms.GaussianBlur(21, 7)(torch.tensor(vd).unsqueeze(0)).numpy()
@@ -81,15 +83,13 @@ def main():
 				vd_min, vd_max = min(vd_min, vd.min()), max(vd_max, vd.max())
 				
 				"""
-				rd_idx, vd_idx = np.round(rd_idx * 40), np.round(vd_idx * 40)
-				for i in range(40):
-					idx = np.where(rd_idx == i)
-				"""
 
+	"""
 	plt.scatter(range_rates, errs)
 	print("Mean err = ", np.mean(errs))
 	plt.show()
 	exit()
+	"""
 
 	print("Everything found: ", len(paired_paths))
 	print(f"RD: ({rd_min:.2f}, {rd_max:.2f}), VD: ({vd_min:.2f}, {vd_max:.2f}).")
