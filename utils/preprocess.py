@@ -174,6 +174,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
 			img = transforms.Resize(112)
+			return img
 		return fun
 	elif method == "small_01":
 		def fun(img):
@@ -181,6 +182,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
 			img = transforms.Resize(112)
+			return img
 		return fun
 	elif method == "hist_complex":
 		def img_to_hist_complex(img, bins = 30):
