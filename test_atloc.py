@@ -3,16 +3,20 @@ from torch import optim
 import os
 from copy import deepcopy
 import matplotlib.pyplot as plt
+import numpy as np
+
+import pyvista as pv
 
 from utils.arguments import get_args
 from utils.nn_utils import get_loaders_loss_metrics, get_models
 
 from torchvision import transforms
 
-def train_val(model, dataloaders, loss_fun, metric_template, device):
+def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 	model.eval()
 
 	transes, err_means, err_maxes = [], [], []
+	all_points_true, all_points_pred = [], []
 
 	for (imgs_v, poses_v), (imgs_r, poses_r) in zip(dataloaders["virtual"], dataloaders["real"]):
 		with torch.no_grad():
@@ -42,18 +46,12 @@ def train_val(model, dataloaders, loss_fun, metric_template, device):
 			err_maxes.append(torch.max(errs).item())
 
 			if dlt_trans > 30:
-			
-				plt.subplot(1, 3, 1)
-				plt.imshow(imgs_v.cpu().numpy().reshape(224, 224))
-				plt.colorbar()
-				plt.subplot(1, 3, 2)
-				plt.imshow(imgs_r.cpu().numpy().reshape(224, 224))
-				plt.colorbar()
-				plt.subplot(1, 3, 3)
-				plt.imshow(errs.cpu().numpy().reshape(224, 224))
-				plt.colorbar()
-				plt.suptitle(f"{dlt_trans:.4f}")
-				plt.show()
+				all_points_true.append(poses_true_v.cpu().numpy().reshape(6)[ : 3])
+				all_points_pred.append(poses_pred_r.cpu().numpy().reshape(6)[ : 3])
+	
+	p.add_points(np.stack(all_points_true, axis = 0), render_points_as_spheres = True, point_size = 5, color = "red")
+	p.add_points(np.stack(all_points_pred, axis = 0), render_points_as_spheres = True, point_size = 5, color = "blue")
+	p.show()
 				
 
 	plt.scatter(err_means, transes)
@@ -65,6 +63,9 @@ def train_val(model, dataloaders, loss_fun, metric_template, device):
 
 def main():
 	args = get_args("atloc", "hisenc")
+	p = pv.Plotter()
+	p.add_mesh(pv.read(args.mesh_path))
+
 	ald = {}
 	args.batch_size = 1
 	args.val_gen = False
@@ -74,7 +75,7 @@ def main():
 	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, single_img_set = True)
 	ald["virtual"] = dataloaders["val"]
 	model, device = get_models(args, "atloc+")
-	train_val(model, ald, loss_fun, metric_template, device)
+	train_val(p, model, ald, loss_fun, metric_template, device)
 
 if __name__ == '__main__':
 	main()

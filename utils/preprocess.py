@@ -141,27 +141,32 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 		return img_to_quantile_sfs
 	elif method == "hist_simple":
 		def img_to_hist_simple(img, bins = 30):
-			img = np.clip(img, 0, 35)
+			img = torch.tensor(img).float().unsqueeze(0)
 			img = (img - img.min()) / (img.max() - img.min())
-			img = np.floor(img * bins) / bins
-			"""
-			if train:
-				img = img + np.random.randn(*img.shape) * 0.2
-			"""
-			return torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
+			img = torch.floor(img * bins) / bins
+			return img.repeat(n_channels, 1, 1)
 		return img_to_hist_simple
+	elif method == "hist_simple_blur":
+		def img_to_hist_simple_blur(img, bins = 30):
+			img = torch.tensor(img).float().unsqueeze(0)
+			img = transforms.GaussianBlur(21, 8)(img)
+			img = (img - img.min()) / (img.max() - img.min())
+			img = torch.floor(img * bins) / bins
+			return img.repeat(n_channels, 1, 1)
+		return img_to_hist_simple_blur
 	elif method == "hist_accurate":
 		def img_to_hist_accurate(img):
-			img = np.clip(img, 0, 35)
+			img = torch.tensor(img).float().unsqueeze(0)
 			img = (img - img.min()) / (img.max() - img.min())
-			"""
-			if train:
-				img = img + np.random.randn(*img.shape) * 0.2
-			"""
-			img = torch.tensor(img).float().unsqueeze(0).repeat(n_channels, 1, 1)
-			img = transforms.GaussianBlur(13)(img)
-			return img
+			return img.repeat(n_channels, 1, 1)
 		return img_to_hist_accurate
+	elif method == "hist_accurate_blur":
+		def img_to_hist_accurate_blur(img):
+			img = torch.tensor(img).float().unsqueeze(0)
+			img = transforms.GaussianBlur(21, 8)(img)
+			img = (img - img.min()) / (img.max() - img.min())
+			return img.repeat(n_channels, 1, 1)
+		return img_to_hist_accurate_blur
 	elif method == "hist_complex":
 		def img_to_hist_complex(img, bins = 30):
 			orig_shape = img.shape
