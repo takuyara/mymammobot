@@ -18,6 +18,10 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 	transes, err_means, err_maxes = [], [], []
 	all_points_true, all_points_pred = [], []
 	trans_err_v, trans_err_r = [], []
+	both_bad, both_good, only_r_bad, only_v_bad = [], [], [], []
+	r_preds, v_preds = [], []
+
+	bad_thres = 15
 
 	for (imgs_v, poses_v), (imgs_r, poses_r) in zip(dataloaders["virtual"], dataloaders["real"]):
 		with torch.no_grad():
@@ -41,22 +45,50 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 			errs = torch.abs(imgs_v - imgs_r)
 			#print("Dom error: {:.4f} {:.4f} {:.4f}".format(torch.mean(errs), torch.min(errs), torch.max(errs)))
 
-			dlt_trans = this_metric_r.get_dict()["translation_error"] - this_metric_v.get_dict()["translation_error"]
+			te_r, te_v = this_metric_r.get_dict()["translation_error"], this_metric_v.get_dict()["translation_error"]
+			dlt_trans = te_r - te_v
 			trans_err_v.append(this_metric_v.get_dict()["translation_error"])
 			trans_err_r.append(this_metric_r.get_dict()["translation_error"])
 			transes.append(dlt_trans)
 			err_means.append(torch.mean(errs).item())
 			err_maxes.append(torch.max(errs).item())
 
-			if dlt_trans > 30:
-				all_points_true.append(poses_true_v.cpu().numpy().reshape(6)[ : 3])
-				all_points_pred.append(poses_pred_r.cpu().numpy().reshape(6)[ : 3])
+			true_pose = this_metric_v.inv_trans(poses_true_v.cpu().numpy()).reshape(6)[ : 3]
+			real_pred = this_metric_r.inv_trans(poses_pred_r.cpu().numpy()).reshape(6)[ : 3]
+			virtual_pred = this_metric_v.inv_trans(poses_pred_v.cpu().numpy()).reshape(6)[ : 3]
+
+			if te_r < bad_thres and te_v < bad_thres:
+				both_good.append(true_pose)
+			elif te_r >= bad_thres and te_v >= bad_thres:
+				both_bad.append(true_pose)
+			elif te_r >= bad_thres:
+				only_r_bad.append(true_pose)
+				r_preds.append(real_pred)
+				v_preds.append(virtual_pred)
+			else:
+				only_v_bad.append(true_pose)
+
 	
-	"""
-	p.add_points(np.stack(all_points_true, axis = 0), render_points_as_spheres = True, point_size = 5, color = "red")
-	p.add_points(np.stack(all_points_pred, axis = 0), render_points_as_spheres = True, point_size = 5, color = "blue")
+	#p.add_points(np.stack(all_points_true, axis = 0), render_points_as_spheres = True, point_size = 5, color = "red")
+	#p.add_points(np.stack(all_points_pred, axis = 0), render_points_as_spheres = True, point_size = 5, color = "blue")
+	
+	#p.add_points(np.stack(both_good, axis = 0), render_points_as_spheres = True, point_size = 10, color = "green")
+	#p.add_points(np.stack(both_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "black")
+	#p.add_points(np.stack(only_r_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "red")
+	#p.add_points(np.stack(only_v_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
+	#p.add_points(np.stack(r_preds, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
+	
+
+	
+	for true_pose, real_pred in zip(only_r_bad, v_preds):
+		ln = pv.Line(true_pose, real_pred)
+		p.add_mesh(ln, color = "red", line_width = 3)
+		p.add_mesh(pv.Arrow(real_pred, real_pred - true_pose, tip_radius = 0.3, tip_length = 0.75), color = "red")
+	
+
+
 	p.show()
-	"""
+	exit()
 
 	print(np.mean(trans_err_v), np.mean(trans_err_r))
 
@@ -88,16 +120,16 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 def main():
 	args = get_args("atloc", "hisenc")
 	p = pv.Plotter()
-	p.add_mesh(pv.read(args.mesh_path))
+	p.add_mesh(pv.read(args.mesh_path), opacity = 0.5)
 
 	ald = {}
 	args.batch_size = 1
 	args.val_gen = False
-	args.val_preprocess = "hist_accurate_blur"
+	args.val_preprocess = "hist_accurate"
 	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, single_img_set = True)
 	ald["real"] = dataloaders["val"]
 	args.val_gen = True
-	args.val_preprocess = "hist_accurate"
+	args.val_preprocess = "hist_accurate_blur"
 	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, single_img_set = True)
 	ald["virtual"] = dataloaders["val"]
 	model, device = get_models(args, "atloc+")

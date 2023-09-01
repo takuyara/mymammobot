@@ -167,3 +167,4 @@ rename_files.py
 *.csv
 virtual_dataset
 real_dataset
+slurm*.out

@@ -15,13 +15,27 @@ class BalancedL1Loss(nn.Module):
 	def __init__(self):
 		super(BalancedL1Loss, self).__init__()
 		self._beta = nn.Parameter(torch.tensor(0.))
-		self._gamma = nn.Parameter(torch.tensor(0.))
+		self._gamma = nn.Parameter(torch.tensor(-3.))
 		self.base_loss = nn.L1Loss()
 
 	def forward(self, inputs, targets):
 		trans_loss = self.base_loss(inputs[..., : 3], targets[..., : 3])
 		rot_loss = self.base_loss(inputs[..., 3 : ], targets[..., 3 : ])
 		loss = trans_loss * torch.exp(-self._beta) + rot_loss * torch.exp(-self._gamma) + self._beta + self._gamma
+		return loss
+
+class TCLoss(nn.Module):
+	def __init__(self, base_loss, relative_coef = 1.):
+		super(TCLoss, self).__init__()
+		self.base_loss = base_loss
+		self.relative_coef = relative_coef
+
+	def forward(self, inputs, targets):
+		loss = self.base_loss(inputs, targets)
+		if inputs.dim == 3:
+			inputs_rela = inputs[ : , 0, ...] - inputs[ : , 1, ...]
+			targets_rela = targets[ : , 0, ...] - targets[ : , 1, ...]
+			loss += self.relative_coef * self.base_loss(inputs_rela, targets_rela)
 		return loss
 
 class Metrics:
@@ -50,6 +64,7 @@ class Metrics:
 		self.n_samples += inp.size(0)
 		self.sum_loss += self.loss_fun(inp, tgt)
 		inp, tgt = inp.cpu().detach().numpy(), tgt.cpu().detach().numpy()
+		inp, tgt = inp.reshape(-1, inp.shape[-1]), tgt.reshape(-1, tgt.shape[-1])
 		inp, tgt = self.inv_trans(inp), self.inv_trans(tgt)
 		for i in range(len(inp)):
 			self.trans_errors.append(np.linalg.norm(inp[i, : 3] - tgt[i, : 3]))

@@ -36,6 +36,8 @@ def main():
 	paired_paths = []
 	rd_min = vd_min = 1e10
 	rd_max = vd_max = -1e10
+
+	rd_maxes, vd_maxes = [], []
 	
 	fun = get_img_transform("./data_stats.json", "hist_accurate_blur", 1, True)
 	fun1 = get_img_transform("./data_stats.json", "hist_accurate", 1, False)
@@ -52,8 +54,6 @@ def main():
 			if row["interp"] == "0" and row["human_eval"] == "1":
 				
 				em_idx, img_idx, try_idx = int(row["em_idx"]), int(row["img_idx"]), int(row["try_idx"])
-				if em_idx != 0 or img_idx != 12:
-					continue
 				real_depth_path = os.path.join("depth-images", f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy")
 				virtual_depth_path = os.path.join("depth-images", f"EM-newfix-{em_idx}-{try_idx}", f"{img_idx:06d}.npy")
 				paired_paths.append((real_depth_path, virtual_depth_path))
@@ -65,6 +65,16 @@ def main():
 					continue
 
 				rd, vd = np.load(real_depth_path), np.load(virtual_depth_path)
+
+				rd_bars, __ = np.histogram(rd, bins = 30)
+				vd_bars, __ = np.histogram(vd, bins = 30)
+				rd_max, vd_max = np.argmax(rd_bars), np.argmax(vd_bars)
+				rd_maxes.append(rd_max)
+				vd_maxes.append(vd_max)
+
+				#print(rd_maxes, vd_maxes)
+
+				continue
 
 				vd_ = transforms.GaussianBlur(21, 7)(torch.tensor(vd).unsqueeze(0)).numpy()
 
@@ -108,6 +118,15 @@ def main():
 	plt.show()
 	exit()
 	"""
+
+	plt.subplot(1, 2, 1)
+	plt.hist(rd_maxes)
+	plt.title("RD")
+	plt.subplot(1, 2, 2)
+	plt.hist(vd_maxes)
+	plt.title("VD")
+	plt.show()
+	exit()
 
 	print("Everything found: ", len(paired_paths))
 	print(f"RD: ({rd_min:.2f}, {rd_max:.2f}), VD: ({vd_min:.2f}, {vd_max:.2f}).")

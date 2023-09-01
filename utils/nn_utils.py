@@ -5,11 +5,12 @@ from torchvision import models
 from torch.utils.data import DataLoader
 
 from utils.file_utils import get_dir_list
-from utils.reg_metrics import Metrics, BalancedL1Loss, TransL2Loss
+from utils.reg_metrics import Metrics, BalancedL1Loss, TransL2Loss, TCLoss
 from utils.preprocess import get_img_transform, get_pose_transforms
 
 from datasets.cl_dataset import CLDataset, TestDataset
 from datasets.single_dataset import SingleImageDataset
+from datasets.single_tcset import SingleTCDataset
 from models.atloc import AtLoc, PoseNet
 from models.fuser import LSTMFuser
 from models.fuse_predictor import MLPFusePredictor
@@ -17,35 +18,47 @@ from models.selector import MLPSelector
 
 def get_loss_fun(args):
 	if args.loss_fun == "l1":
-		return nn.L1Loss()
+		bloss = nn.L1Loss()
 	elif args.loss_fun == "l2":
-		return nn.MSELoss()
+		bloss = nn.MSELoss()
 	elif args.loss_fun == "l2_trans":
-		return TransL2Loss()
+		bloss = TransL2Loss()
 	elif args.loss_fun == "balanced_l1":
-		return BalancedL1Loss()
+		bloss = BalancedL1Loss()
 	else:
 		raise NotImplementedError
+	if args.uses_tc:
+		bloss = TCLoss(bloss, relative_coef = args.relative_coef)
+	return bloss
 
-def get_loaders_loss_metrics(args, test = False, test_set = False, single_img_set = False):
+def get_loaders_loss_metrics(args, test = False, dset_names = "single"):
 	input_modality = args.test_modality if test else "mesh"
 	pose_trans, pose_inv_trans = get_pose_transforms(args.data_stats, args.hispose_noise, input_modality)
 	if test:
-		phase_split_path = [("test", args.test_split, args.test_preprocess, args.mesh_path if args.test_gen else None, args.test_rotatable)]
+		phase_split_path = [("test", args.test_split, args.test_preprocess, args.mesh_path if args.test_gen else None)]
 	else:
-		phase_split_path = [("train", args.train_split, args.train_preprocess, args.mesh_path if args.train_gen else None, args.train_rotatable),
-			("val", args.val_split, args.val_preprocess, args.mesh_path if args.val_gen else None, args.val_rotatable)]
-	if not single_img_set:
-		batch_size, ds_type = (1, TestDataset) if test and test_set else (args.batch_size, CLDataset)
-		datasets = {phase : ds_type(args.base_dir, get_dir_list(split_path), args.length, args.spacing, args.img_size, mesh_path, args.skip_prev_frame,
-			transform_img = get_img_transform(args.data_stats, preprocess, args.n_channels, phase == "train"), transform_pose = pose_trans) for phase, split_path, preprocess, mesh_path, __ in phase_split_path}
-	else:
-		batch_size = args.batch_size
-		datasets = {phase : SingleImageDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, rotatable = rotate,
-			transform_img = get_img_transform(args.data_stats, preprocess, args.n_channels, phase == "train"), transform_pose = pose_trans) for phase, split_path, preprocess, mesh_path, rotate in phase_split_path}
+		phase_split_path = [("train", args.train_split, args.train_preprocess, args.mesh_path if args.train_gen else None),
+			("val", args.val_split, args.val_preprocess, args.mesh_path if args.val_gen else None)]
 
-	dataloaders = {phase : DataLoader(ds, batch_size = batch_size,
-		num_workers = args.num_workers, shuffle = phase == "train") for phase, ds in datasets.items()}
+	if type(dset_names) != list:
+		dset_names = [dset_names] * len(phase_split_path)
+
+	dataloaders = {}
+	for (phase, split_path, preprocess, mesh_path), ds_name in zip(phase_split_path, dset_names):
+		img_trans = get_img_transform(args.data_stats, preprocess, args.n_channels, phase == "train")
+		if ds_name == "single":
+			dset = SingleImageDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, img_trans, pose_trans)
+		elif ds_name == "single_tc":
+			dset = SingleTCDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, args.temporal_max, img_trans, pose_trans)
+		elif ds_name == "cl":
+			dset = CLDataset(args.base_dir, get_dir_list(split_path), args.length, args.spacing, args.img_size, mesh_path, args.skip_prev_frame, img_trans, pose_trans)
+		elif ds_name == "cl_test":
+			dset = TestDataset(args.base_dir, get_dir_list(split_path), args.length, args.spacing, args.img_size, mesh_path, args.skip_prev_frame, img_trans, pose_trans)
+		else:
+			raise NotImplementedError
+		dloader = DataLoader(dset, batch_size = 1 if ds_name == "cl_test" else args.batch_size, num_workers = args.num_workers, shuffle = phase == "train")
+		dataloaders[phase] = dloader
+
 	if test:
 		dataloaders = dataloaders["test"]
 	loss_fun = get_loss_fun(args)

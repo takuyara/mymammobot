@@ -83,7 +83,7 @@ def generate_rotatable_images(mesh_path, cl_path, output_path, num_samples, img_
 			t_orientation = t_orientation / np.linalg.norm(t_orientation)
 
 
-			t_up = arbitrary_perpendicular_vector(t_orientation)
+			t_up = rotate_single_vector(arbitrary_perpendicular_vector(t_orientation), t_orientation, angle_gen())
 
 			rgb, dep = get_depth_map(zoomed_plotter, t_position, t_orientation, t_up, get_outputs = True, zoom = zoom_scale)
 			"""
@@ -104,7 +104,7 @@ def generate_rotatable_images(mesh_path, cl_path, output_path, num_samples, img_
 			if abs(np.max(np.min(rgb, axis = -1)) - 255) < 1e-2:
 				continue
 
-			out_pose = np.stack([t_position, t_orientation], axis = 0)
+			out_pose = np.stack([t_position, t_orientation, t_up], axis = 0)
 			np.savetxt(os.path.join(output_path, f"{img_idx:06d}.txt"), out_pose, fmt = "%.6f")
 			if not out_pose_only:
 				cv2.imwrite(os.path.join(output_path, f"{img_idx:06d}.png"), rgb)

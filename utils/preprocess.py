@@ -1,3 +1,4 @@
+import os
 import cv2
 import json
 import torch
@@ -9,8 +10,20 @@ from scipy import ndimage
 from ds_gen.rotatable_single_images import rotate_and_crop
 from ds_gen.depth_map_generation import get_depth_map
 from utils.misc import randu_gen
-from utils.pose_utils import compute_rotation_quaternion, get_3dof_quat, revert_quat, camera_pose_to_train_pose
+from utils.pose_utils import compute_rotation_quaternion, get_3dof_quat, revert_quat, camera_pose_to_train_pose, get_6dof_pose_label
 from utils.geometry import rotate_single_vector, arbitrary_perpendicular_vector
+
+def load_img_pose(base_path, idx, plotter):
+	pose = np.loadtxt(os.path.join(base_path, f"{idx:06d}.txt"))
+	pose_tup = pose[0], pose[1], pose[2]
+	if plotter is not None:
+		img = get_depth_map(plotter, *pose_tup)
+	else:
+		img = np.load(os.path.join(base_path, f"{idx:06d}.npy"))
+	img = np.nan_to_num(img, nan = 200)
+	pose = camera_pose_to_train_pose(*pose_tup)
+	pose = get_6dof_pose_label(pose)
+	return img, torch.tensor(pose)
 
 def random_rotate_camera(img, pose, img_size, plotter = None, deg = 0, zoom_scale = 1.0):
 	position, orientation = pose[0, ...], pose[1, ...]
@@ -23,7 +36,7 @@ def random_rotate_camera(img, pose, img_size, plotter = None, deg = 0, zoom_scal
 		assert deg == 0
 	else:
 		img = get_depth_map(plotter, position, orientation, up, zoom = zoom_scale)
-	img = np.nan_to_num(img, nan = 200)
+	
 	"""
 	if np.any(np.isnan(img)):
 		img = np.zeros_like(img)

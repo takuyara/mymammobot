@@ -17,11 +17,8 @@ def train_val(model, dataloaders, optimiser, epochs, loss_fun, metric_template, 
 			for b_id, (imgs, poses) in enumerate(dataloaders[phase]):
 				with torch.set_grad_enabled(phase == "train"):
 					imgs, poses_true = imgs.to(device).float(), poses.to(device).float()
-					print(imgs.shape, poses_true.shape)
 					#b, s, c, w, h to b, c, s, w, h
-					imgs = imgs.view(-1, *imgs.shape[-3 : ])
-					print(imgs.shape)
-					poses_pred = model(imgs).view(poses_true.shape)
+					poses_pred = model(imgs)
 					loss = loss_fun(poses_true, poses_pred)
 				if phase == "train":
 					optimiser.zero_grad()
@@ -36,9 +33,7 @@ def train_val(model, dataloaders, optimiser, epochs, loss_fun, metric_template, 
 
 def main():
 	args = get_args("atloc")
-	train_set = "single_tc" if args.uses_tc else "single"
-	val_set = "single_tc" if args.uses_tc and args.val_tc else "single"
-	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = [train_set, val_set])
+	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, sets = ["single_tc", "single_tc"])
 	model, device = get_models(args, "atloc")
 	optimiser = optim.Adam([p for p in model.parameters()] + [p for p in loss_fun.parameters()], lr = args.learning_rate)
 	min_loss, min_epoch, best_state_dict = train_val(model, dataloaders, optimiser, args.epochs, loss_fun, metric_template, device)
