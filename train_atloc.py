@@ -17,10 +17,10 @@ def train_val(model, dataloaders, optimiser, epochs, loss_fun, metric_template, 
 			for b_id, (imgs, poses) in enumerate(dataloaders[phase]):
 				with torch.set_grad_enabled(phase == "train"):
 					imgs, poses_true = imgs.to(device).float(), poses.to(device).float()
-					print(imgs.shape, poses_true.shape)
+					#print(imgs.shape, poses_true.shape)
 					#b, s, c, w, h to b, c, s, w, h
 					imgs = imgs.view(-1, *imgs.shape[-3 : ])
-					print(imgs.shape)
+					#print(imgs.shape)
 					poses_pred = model(imgs).view(poses_true.shape)
 					loss = loss_fun(poses_true, poses_pred)
 				if phase == "train":
