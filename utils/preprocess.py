@@ -289,5 +289,8 @@ def get_pose_transforms_classification(all_cls):
 		cl_dists = np.sum((x[...,  : 3] - cl_ref) ** 2, axis = -1)
 		return int(cl_ref_labels[np.argmin(cl_dists)])
 	def inv_trans(x):
-		return np.argmax(x, axis = -1)
+		if len(x.shape) == 2:
+			return np.argmax(x, axis = -1)
+		else:
+			return x
 	return trans, inv_trans
