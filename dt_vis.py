@@ -46,6 +46,9 @@ def main():
 	fun = get_img_transform("./data_stats.json", "mesh2sfs", 1, True)
 	fun1 = get_img_transform("./data_stats.json", "sfs", 1, False)
 	"""
+	B = 500
+	base_hist = np.zeros((B, B))
+	num_hists = 0
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
 		rd_sum, rd_cnt, vd_sum, vd_cnt = np.zeros(40), np.zeros(40), np.zeros(40), np.zeros(40)
@@ -65,6 +68,13 @@ def main():
 					continue
 
 				rd, vd = np.load(real_depth_path), np.load(virtual_depth_path)
+
+				rd = fun1(rd).numpy().reshape(224, 224)
+				vd = fun(vd).numpy().reshape(224, 224)
+				t_hist = np.histogram2d(rd.ravel(), vd.ravel(), bins = B, range = [[0, 1], [0, 1]], density = True)[0]
+				base_hist += t_hist
+				num_hists += 1
+				continue
 
 				rd_bars, __ = np.histogram(rd, bins = 30)
 				vd_bars, __ = np.histogram(vd, bins = 30)
@@ -118,6 +128,12 @@ def main():
 	plt.show()
 	exit()
 	"""
+
+	base_hist = np.minimum(base_hist / num_hists, 50)
+
+	plt.imshow(base_hist.T, origin = "lower")
+	plt.show()
+	exit()
 
 	plt.subplot(1, 2, 1)
 	plt.hist(rd_maxes)
