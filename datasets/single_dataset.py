@@ -10,7 +10,7 @@ from utils.preprocess import random_rotate_camera
 from utils.misc import randu_gen
 
 class SingleImageDataset(Dataset):
-	def __init__(self, base_dir, dir_list, img_size, mesh_path, transform_img, transform_pose):
+	def __init__(self, base_dir, dir_list, img_size, mesh_path, all_cls, transform_img, transform_pose):
 		super(SingleImageDataset, self).__init__()
 		self.samples = []
 		angle_gen = randu_gen(0, 360)
@@ -28,6 +28,18 @@ class SingleImageDataset(Dataset):
 		else:
 			self.plotter = pv.Plotter(off_screen = True, window_size = (img_size, img_size))
 			self.plotter.add_mesh(pv.read(mesh_path))
+
+		if all_cls is not None:
+			self.cl_ref = np.concatenate([points for i, (points, __) in enumerate(all_cls)], axis = 0)
+			self.cl_ref_labels = np.concatenate([np.ones(len(points)) * i for i, (points, __) in enumerate(all_cls)], axis = 0)
+		else:
+			self.cl_ref = self.cl_ref_labels = None
+	
+	def trans(self, x):
+		if self.cl_ref is None:
+			return x
+		cl_dists = np.sum((x[...,  : 3] - self.cl_ref) ** 2, axis = -1)
+		return int(self.cl_ref_labels[np.argmin(cl_dists)])
 	
 	def __len__(self):
 		return len(self.samples)
@@ -40,7 +52,7 @@ class SingleImageDataset(Dataset):
 			img = None
 		pose = np.loadtxt(os.path.join(p, f"{i:06d}.txt"))
 		img, pose = random_rotate_camera(img, pose, self.img_size, self.plotter, 0, zoom_scale = self.zoom_gen())
-		pose = get_6dof_pose_label(pose)
+		pose = self.trans(get_6dof_pose_label(pose))
 		
 		if self.transform_img is not None:
 			img = self.transform_img(img)

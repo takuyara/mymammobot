@@ -45,6 +45,7 @@ def get_loaders_loss_metrics(args, test = False, dset_names = "single"):
 	else:
 		pose_trans, pose_inv_trans = get_pose_transforms(args.data_stats, args.hispose_noise, input_modality)
 		metric_name = Metrics_Reg
+		all_cls = None
 
 	if test:
 		phase_split_path = [("test", args.test_split, args.test_preprocess, args.mesh_path if args.test_gen else None)]
@@ -59,7 +60,7 @@ def get_loaders_loss_metrics(args, test = False, dset_names = "single"):
 	for (phase, split_path, preprocess, mesh_path), ds_name in zip(phase_split_path, dset_names):
 		img_trans = get_img_transform(args.data_stats, preprocess, args.n_channels, phase == "train")
 		if ds_name == "single":
-			dset = SingleImageDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, img_trans, pose_trans)
+			dset = SingleImageDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, all_cls, img_trans, pose_trans)
 		elif ds_name == "single_tc":
 			dset = SingleTCDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, args.temporal_max, img_trans, pose_trans)
 		elif ds_name == "cl":
