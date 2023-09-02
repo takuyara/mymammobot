@@ -33,22 +33,19 @@ class FourDirectionalLSTM(nn.Module):
         return torch.cat([hlr_fw, hlr_bw, hud_fw, hud_bw], dim=1)
 
 class PoseNet(nn.Module):
-    def __init__(self, feature_extractor, droprate = 0.5, n_channels = 1):
+    def __init__(self, feature_extractor, output_dim = 6, droprate = 0.5, n_channels = 1):
         super(PoseNet, self).__init__()
         self.feature_extractor = feature_extractor
         if n_channels != 3:
             self.feature_extractor.conv1 = nn.Conv2d(n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
         self.feature_extractor.avgpool = nn.AdaptiveAvgPool2d(1)
         fe_out_planes = self.feature_extractor.fc.in_features
-        mlps, o_dim = get_mlp(fe_out_planes, [512, 1024, 2048], droprate)
+        mlps, o_dim = get_mlp(fe_out_planes, [512,], droprate)
         self.feature_extractor.fc = mlps
-        self.fc_xyz = nn.Linear(o_dim, 3)
-        self.fc_wpqr = nn.Linear(o_dim, 3)
+        self.fc = nn.Linear(o_dim, output_dim)
     def forward(self, x, get_encode = False, return_both = False):
         x = self.feature_extractor(x)
-        xyz = self.fc_xyz(x)
-        wpqr = self.fc_wpqr(x)
-        out = torch.cat((xyz, wpqr), 1)
+        out = self.fc(x)
         if get_encode:
             if return_both:
                 return x, out
