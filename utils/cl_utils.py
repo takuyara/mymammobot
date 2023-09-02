@@ -26,6 +26,15 @@ def load_all_cls(base_path, n_cls = 50):
 			all_cls.append((points, radiuses))
 	return all_cls
 
+def load_all_cls_npy(base_path, n_cls = 50):
+	all_cls = []
+	for cl_idx in range(n_cls):
+		path = os.path.join(base_path, f"CL{cl_idx}.npy")
+		if os.path.exists(path):
+			x = np.load(path)
+			all_cls.append((x[ : , : 3], x[ : , 3 : ].reshape(-1)))
+	return all_cls
+
 def locate_on_cl(x, all_cls, n_candidates = 50):
 	min_dist = 1e10
 	for cl_idx, (cl_points, __) in enumerate(all_cls):
@@ -120,7 +129,7 @@ def get_direction_radius_dynamics(points, radius, idx, smoothing_dist = 5):
 def index2point(all_cls, cl_indices):
 	return all_cls[cl_indices[0]][0][cl_indices[1], ...]
 
-def check_proj_on_cl_seqs(x, all_cls, cl_seqs_p, tolerance, n_candidates = 10):
+def check_proj_on_cl_seqs(x, cl_seqs_p, tolerance, n_candidates = 10):
 	for cl_points in cl_seqs_p:
 		cl_points = np.array(cl_points)
 		cl_dists = np.sum((cl_points - x) ** 2, axis = 1)
@@ -132,7 +141,7 @@ def check_proj_on_cl_seqs(x, all_cls, cl_seqs_p, tolerance, n_candidates = 10):
 				return True
 	return False
 
-def get_unique_cl_indices(all_cls, tolerance = 0.1):
+def get_unique_cl_indices(all_cls, tolerance = 0.1, flatten = True):
 	cl_seqs = []
 	cl_seqs_p = []
 	current_buffer = []
@@ -142,7 +151,7 @@ def get_unique_cl_indices(all_cls, tolerance = 0.1):
 		this_cl_points = this_cl[0]
 		for on_line_idx, point in enumerate(this_cl_points):
 			num_total_points += 1
-			if not check_proj_on_cl_seqs(point, all_cls, cl_seqs_p, tolerance):
+			if not check_proj_on_cl_seqs(point, cl_seqs_p, tolerance):
 				current_buffer.append((cl_idx, on_line_idx))
 				current_buffer_p.append(point)
 			else:
@@ -161,17 +170,18 @@ def get_unique_cl_indices(all_cls, tolerance = 0.1):
 		for cl_indices in cl_seq:
 			cl_seq_flatten.append(cl_indices)
 	print(f"Survived: {len(cl_seq_flatten)} / {num_total_points}.")
-	return cl_seq_flatten
+	return cl_seq_flatten if flatten else cl_seqs
 
-def get_first_diff(pts1, pts2, tolerance = 0.1, n_candidates = 20):
-	for on_line_idx_1, pt1 in enumerate(pts1):
+def get_first_diff(pts1, pts2, tolerance = 0.1, n_candidates = 20, init_ignore = 100):
+	pts2 = pts2[init_ignore : ]
+	for on_line_idx_1, pt1 in enumerate(pts1[init_ignore : ]):
 		cl_dists = np.sum((pt1 - pts2) ** 2, axis = 1)
 		for i in np.argsort(cl_dists)[ : n_candidates]:
 			if i + 1 >= len(pts2):
 				continue
 			x_ = project_point_to_line(pt1, pts2[i, ...], pts2[i + 1, ...])
 			if np.linalg.norm(x_ - pt1) < tolerance:
-				return on_line_idx_1
+				return on_line_idx_1 + init_ignore
 	return None
 
 def get_unique_between_pairs(all_cls, cl_idx_1, cl_idx_2, turning_buffer = 10):
@@ -192,3 +202,64 @@ def project_to_line_dynamics(points, radius, x, cur_idx, n_candidates = 30):
 		if np.linalg.norm(x_ - x) < min_dist:
 			min_dist, ret_idx = np.linalg.norm(x_ - x), i
 	return i, radius[i], min_dist
+
+def find_max_intersection(points_1, points_2, tolerance = 0.6):
+	flag1, flag2 = np.zeros(len(points_1)), np.zeros(len(points_2))
+	for i, p1 in enumerate(points_1):
+		if check_proj_on_cl_seqs(p1, [points_2], tolerance):
+			flag1[i] = 1
+	for i, p2 in enumerate(points_2):
+		if check_proj_on_cl_seqs(p2, [points_1], tolerance):
+			flag2[i] = 1
+	segs1, segs2 = get_continuous_segs(flag1, target = 1), get_continuous_segs(flag2, target = 1)
+	if len(segs1) == 0 or len(segs2) == 0:
+		return (-1, -1), (-1, -1)
+	range1 = max(segs1, key = lambda x : x[1] - x[0])
+	range2 = max(segs2, key = lambda x : x[1] - x[0])
+	return range1, range2
+
+def get_according_splits(orig_seg, range_list):
+	res = []
+	for l, r in range_list:
+		if r - l > 0:
+			res.append((orig_seg[0][l : r, ...], orig_seg[1][l : r, ...]))
+	return res
+
+def get_continuous_segs(a, target):
+	prev_idx = -1
+	res = []
+	for i in range(len(a)):
+		if a[i] != target:
+			if i - prev_idx - 1 > 0:
+				res.append((prev_idx + 1, i))
+			prev_idx = i
+	if len(a) - prev_idx - 1 > 0:
+		res.append((prev_idx + 1, len(a)))
+	return res
+
+def search_tree(p, segs, dist_threshold = 0.5, get_minimal = False):
+	pass
+
+def cut_cls(all_cls, min_len = 30, get_tree_struct = False):
+	current_segs = []
+	root_avgs = []
+	for cl_idx in range(len(all_cls)):
+		root_avgs.append(all_cls[cl_idx][0][0, ...])
+		overlap_flags = np.zeros(len(all_cls[cl_idx][0]))
+		for comp_idx in range(len(current_segs)):
+			(int_comp_l, int_comp_r), (int_cur_l, int_cur_r) = find_max_intersection(current_segs[comp_idx][0], all_cls[cl_idx][0])
+			overlap_flags[int_cur_l : int_cur_r] = 1
+			if int_comp_r - int_comp_l > 0:
+				split_comp = get_according_splits(current_segs[comp_idx], [(int_comp_l, int_comp_r), (0, int_comp_l), (int_comp_r, len(current_segs[comp_idx][0]))])
+				current_segs[comp_idx] = split_comp[0]
+				current_segs.extend(split_comp[1 : ])
+		cur_unique_indices = get_continuous_segs(overlap_flags, target = 0)
+		#print(cur_unique_indices)
+		current_segs.extend(get_according_splits(all_cls[cl_idx], cur_unique_indices))
+	filtered_segs = [cur_seg for cur_seg in current_segs if len(cur_seg[0]) >= min_len]
+	if get_tree_struct:
+		root_avgs = np.mean(np.stack(root_avgs, axis = 0), axis = 0)
+		raise NotImplementedError
+
+	#print(current_segs)
+	return filtered_segs

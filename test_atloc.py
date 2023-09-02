@@ -74,16 +74,19 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 	
 	#p.add_points(np.stack(both_good, axis = 0), render_points_as_spheres = True, point_size = 10, color = "green")
 	#p.add_points(np.stack(both_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "black")
-	#p.add_points(np.stack(only_r_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "red")
+	p.add_points(np.stack(only_r_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "red")
 	#p.add_points(np.stack(only_v_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
-	#p.add_points(np.stack(r_preds, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
+	p.add_points(np.stack(r_preds, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
 	
 
 	
+	"""
 	for true_pose, real_pred in zip(only_r_bad, v_preds):
 		ln = pv.Line(true_pose, real_pred)
 		p.add_mesh(ln, color = "red", line_width = 3)
 		p.add_mesh(pv.Arrow(real_pred, real_pred - true_pose, tip_radius = 0.3, tip_length = 0.75), color = "red")
+	"""
+
 	
 
 
@@ -126,11 +129,11 @@ def main():
 	args.batch_size = 1
 	args.val_gen = False
 	args.val_preprocess = "hist_accurate"
-	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, single_img_set = True)
+	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["single_tc", "single"])
 	ald["real"] = dataloaders["val"]
 	args.val_gen = True
 	args.val_preprocess = "hist_accurate_blur"
-	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, single_img_set = True)
+	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["single_tc", "single"])
 	ald["virtual"] = dataloaders["val"]
 	model, device = get_models(args, "atloc+")
 	train_val(p, model, ald, loss_fun, metric_template, device)

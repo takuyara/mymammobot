@@ -4,9 +4,10 @@ from torch import nn
 from torchvision import models
 from torch.utils.data import DataLoader
 
+from utils.cl_utils import load_all_cls_npy
 from utils.file_utils import get_dir_list
-from utils.reg_metrics import Metrics, BalancedL1Loss, TransL2Loss, TCLoss
-from utils.preprocess import get_img_transform, get_pose_transforms
+from utils.reg_metrics import Metrics_Reg, Metrics_Cls, BalancedL1Loss, TransL2Loss, TCLoss
+from utils.preprocess import get_img_transform, get_pose_transforms, get_pose_transforms_classification
 
 from datasets.cl_dataset import CLDataset, TestDataset
 from datasets.single_dataset import SingleImageDataset
@@ -17,7 +18,10 @@ from models.fuse_predictor import MLPFusePredictor
 from models.selector import MLPSelector
 
 def get_loss_fun(args):
-	if args.loss_fun == "l1":
+	if args.cls:
+		bloss = nn.CrossEntropyLoss()
+		assert not args.uses_tc
+	elif args.loss_fun == "l1":
 		bloss = nn.L1Loss()
 	elif args.loss_fun == "l2":
 		bloss = nn.MSELoss()
@@ -33,7 +37,15 @@ def get_loss_fun(args):
 
 def get_loaders_loss_metrics(args, test = False, dset_names = "single"):
 	input_modality = args.test_modality if test else "mesh"
-	pose_trans, pose_inv_trans = get_pose_transforms(args.data_stats, args.hispose_noise, input_modality)
+	if args.cls:
+		all_cls = load_all_cls_npy(args.seg_cl_path)
+		pose_trans, pose_inv_trans = get_pose_transforms_classification(all_cls)
+		args.output_dim = len(all_cls)
+		metric_name = Metrics_Cls
+	else:
+		pose_trans, pose_inv_trans = get_pose_transforms(args.data_stats, args.hispose_noise, input_modality)
+		metric_name = Metrics_Reg
+
 	if test:
 		phase_split_path = [("test", args.test_split, args.test_preprocess, args.mesh_path if args.test_gen else None)]
 	else:
@@ -62,7 +74,7 @@ def get_loaders_loss_metrics(args, test = False, dset_names = "single"):
 	if test:
 		dataloaders = dataloaders["test"]
 	loss_fun = get_loss_fun(args)
-	return dataloaders, loss_fun, Metrics(loss_fun, pose_inv_trans, args.model_sel_metric, args.model_sel_rot_coef)
+	return dataloaders, loss_fun, metric_name(loss_fun, pose_inv_trans, args.model_sel_metric, args.model_sel_rot_coef)
 
 def get_models(args, *names):
 	device = torch.device(args.device)
@@ -76,9 +88,9 @@ def get_models(args, *names):
 			elif args.atloc_base == "resnet50":
 				base = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
 			if args.uses_posenet:
-				model = PoseNet(base, droprate = args.dropout, n_channels = args.n_channels).to(device)
+				model = PoseNet(base, output_dim = args.output_dim, droprate = args.dropout, n_channels = args.n_channels).to(device)
 			else:
-				model = AtLoc(base, droprate = args.dropout, feat_dim = args.img_encode_dim, n_channels = args.n_channels).to(device)
+				model = AtLoc(base, output_dim = args.output_dim, droprate = args.dropout, feat_dim = args.img_encode_dim, n_channels = args.n_channels).to(device)
 			if t_name.endswith("+"):
 				model.load_state_dict(torch.load(os.path.join(args.save_path, args.atloc_path)))
 		elif t_name.startswith("hisenc"):

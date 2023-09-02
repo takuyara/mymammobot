@@ -59,7 +59,7 @@ class PoseNet(nn.Module):
 
 
 class AtLoc(nn.Module):
-    def __init__(self, feature_extractor, droprate=0.5, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
+    def __init__(self, feature_extractor, output_dim = 6, droprate=0.5, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
         super(AtLoc, self).__init__()
         self.droprate = droprate
         self.lstm = lstm
@@ -74,16 +74,20 @@ class AtLoc(nn.Module):
 
         if self.lstm:
             self.lstm4dir = FourDirectionalLSTM(seq_size=32, origin_feat_size=feat_dim, hidden_size=256)
-            self.fc_xyz = nn.Linear(feat_dim // 2, 3)
-            self.fc_wpqr = nn.Linear(feat_dim // 2, 3)
+            fc_in_dim = feat_dim // 2
         else:
             self.att = AttentionBlock(feat_dim)
-            self.fc_xyz = nn.Linear(feat_dim, 3)
-            self.fc_wpqr = nn.Linear(feat_dim, 3)
+            fc_in_dim = feat_dim
+
+        """
+        self.fc_xyz = nn.Linear(fc_in_dim, 3)
+        self.fc_wpqr = nn.Linear(fc_in_dim, 3)
+        """
+        self.fc = nn.Linear(fc_in_dim, output_dim)
 
         # initialize
         if pretrained:
-            init_modules = [self.feature_extractor.fc, self.fc_xyz, self.fc_wpqr]
+            init_modules = [self.feature_extractor.fc, self.fc]
         else:
             init_modules = self.modules()
 
@@ -105,9 +109,12 @@ class AtLoc(nn.Module):
         if self.droprate > 0:
             x = F.dropout(x, p=self.droprate)
 
+        """
         xyz = self.fc_xyz(x)
         wpqr = self.fc_wpqr(x)
         out = torch.cat((xyz, wpqr), 1)
+        """
+        out = self.fc(x)
         if get_encode:
             if return_both:
                 return x, out

@@ -281,3 +281,13 @@ def get_pose_transforms(data_stats_path, hispose_noise, modality):
 	trans = trans_norm
 	inv_trans = lambda x : x * pose_std + pose_mean
 	return trans, inv_trans
+
+def get_pose_transforms_classification(all_cls):
+	cl_ref = np.concatenate([points for i, (points, __) in enumerate(all_cls)], axis = 0)
+	cl_ref_labels = np.concatenate([np.ones(len(points)) * i for i, (points, __) in enumerate(all_cls)], axis = 0)
+	def trans(x, true_pose):
+		cl_dists = np.sum((x[...,  : 3] - cl_ref) ** 2, axis = -1)
+		return int(cl_ref_labels[np.argmin(cl_dists)])
+	def inv_trans(x):
+		return np.argmax(x, axis = -1)
+	return trans, inv_trans
