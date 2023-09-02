@@ -72,8 +72,10 @@ class Metrics_Cls:
 		self.n_samples += inp.size(0)
 		self.sum_loss += self.loss_fun(inp, tgt)
 		inp, tgt = inp.cpu().detach().numpy(), tgt.cpu().detach().numpy()
-		inp, tgt = inp.reshape(-1, inp.shape[-1]), tgt.reshape(-1, tgt.shape[-1])
+		#inp, tgt = inp.reshape(-1, inp.shape[-1]), tgt.reshape(-1, tgt.shape[-1])
+		#print("Before: ", inp.shape, tgt.shape)
 		inp, tgt = self.inv_trans(inp), self.inv_trans(tgt)
+		#print("After: ", inp.shape, tgt.shape)
 		self.inp_lbs.append(inp)
 		self.tgt_lbs.append(tgt)
 		"""
