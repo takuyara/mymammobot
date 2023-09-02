@@ -57,7 +57,7 @@ class Metrics_Cls:
 	def main_metric(self):
 		inp = np.concatenate(self.inp_lbs, axis = 0)
 		tgt = np.concatenate(self.tgt_lbs, axis = 0)
-		return f1_score(tgt, inp, average = "micro")
+		return -f1_score(tgt, inp, average = "micro")
 		"""
 		if self.main_metric_name == "loss":
 			return self.loss()
