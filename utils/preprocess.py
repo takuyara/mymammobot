@@ -180,7 +180,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 		return img_to_hist_accurate_blur
 	elif method == "hist_accurate_blur_jitter":
 		blur = transforms.GaussianBlur(21, 7)
-		color_jitter = transforms.ColorJitter(brightness = 0.1, contrast = 0.3, saturation = 0, hue = 0)
+		color_jitter = transforms.ColorJitter(brightness = 0.1, contrast = [0.7, 1.1], saturation = 0, hue = 0)
 		def img_to_hist_accurate_blur_jitter(img):
 			img = torch.tensor(img).float().unsqueeze(0)
 			img = blur(img)

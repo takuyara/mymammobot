@@ -10,6 +10,8 @@ import pyvista as pv
 from utils.arguments import get_args
 from utils.nn_utils import get_loaders_loss_metrics, get_models
 
+from sklearn.metrics import confusion_matrix
+
 from torchvision import transforms
 
 def train_val(p, model, dataloaders, loss_fun, metric_template, device):
@@ -27,32 +29,34 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 
 	for (imgs_v, poses_v), (imgs_r, poses_r) in zip(dataloaders["virtual"], dataloaders["real"]):
 		with torch.no_grad():
-			assert torch.abs(poses_v - poses_r).max() < 1e-4
+			#assert torch.abs(poses_v - poses_r).max() < 1e-4
 			this_metric_v = metric_template.new_copy()
 			this_metric_r = metric_template.new_copy()
 
-			imgs_v, poses_true_v = imgs_v.to(device).float(), poses_v.to(device).float()
-			imgs_r, poses_true_r = imgs_r.to(device).float(), poses_r.to(device).float()
+			#imgs_v, poses_true_v = imgs_v.to(device).float(), poses_v.to(device).float()
+			imgs_r, poses_true_r = imgs_r.to(device), poses_r.to(device)
 
 			#imgs_r = transforms.Compose([transforms.CenterCrop(190), transforms.Resize(224)])(imgs_r)
 			#b, s, c, w, h to b, c, s, w, h
-			poses_pred_v = model(imgs_v)
+			#poses_pred_v = model(imgs_v)
 			poses_pred_r = model(imgs_r)
+			"""
 			loss_v = loss_fun(poses_true_v, poses_pred_v)
 			loss_r = loss_fun(poses_true_r, poses_pred_r)
 			this_metric_v.add_batch(poses_true_v, poses_pred_v)
 			this_metric_r.add_batch(poses_true_r, poses_pred_r)
+			"""
 			#print("Virtual: ", this_metric_v)
 			#print("Real: ", this_metric_r)
-			errs = torch.abs(imgs_v - imgs_r)
+			#errs = torch.abs(imgs_v - imgs_r)
 			#print("Dom error: {:.4f} {:.4f} {:.4f}".format(torch.mean(errs), torch.min(errs), torch.max(errs)))
 
-			true_lb = poses_r.item()
+			true_lb = poses_true_r.item()
 			pred_lb = torch.argmax(poses_pred_r, dim = -1).item()
 			true_lbs.append(true_lb)
 			pred_lbs.append(pred_lb)
 			if true_lb != pred_lb:
-				only_r_bad.append()
+				only_r_bad.append(metric_template.inv_trans(poses_v.numpy()).reshape(6)[ : 3])
 
 			"""
 			te_r, te_v = this_metric_r.get_dict()["translation_error"], this_metric_v.get_dict()["translation_error"]
@@ -87,7 +91,11 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 	#p.add_points(np.stack(both_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "black")
 	p.add_points(np.stack(only_r_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "red")
 	#p.add_points(np.stack(only_v_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
-	p.add_points(np.stack(r_preds, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
+	#p.add_points(np.stack(r_preds, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
+	
+	mat = confusion_matrix(true_lbs, pred_lbs)
+	for i in range(len(mat)):
+		print(f"true={i}", " ".join(["{}".format(mat[i, j]) for j in range(len(mat))]))
 	
 
 	
@@ -140,11 +148,15 @@ def main():
 	args.batch_size = 1
 	args.val_gen = False
 	args.val_preprocess = "hist_accurate"
-	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["single_tc", "single"])
+	args.cls = True
+	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["single", "single"])
 	ald["real"] = dataloaders["val"]
+	"""
 	args.val_gen = True
 	args.val_preprocess = "hist_accurate_blur"
-	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["single_tc", "single"])
+	"""
+	args.cls = False
+	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["single", "single"])
 	ald["virtual"] = dataloaders["val"]
 	model, device = get_models(args, "atloc+")
 	train_val(p, model, ald, loss_fun, metric_template, device)
