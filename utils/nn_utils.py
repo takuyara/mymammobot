@@ -60,7 +60,7 @@ def get_loaders_loss_metrics(args, test = False, dset_names = "single"):
 	for (phase, split_path, preprocess, mesh_path), ds_name in zip(phase_split_path, dset_names):
 		img_trans = get_img_transform(args.data_stats, preprocess, args.n_channels, phase == "train")
 		if ds_name == "single":
-			dset = SingleImageDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, all_cls, img_trans, pose_trans)
+			dset = SingleImageDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, args.cls, img_trans, pose_trans)
 		elif ds_name == "single_tc":
 			dset = SingleTCDataset(args.base_dir, get_dir_list(split_path), args.img_size, mesh_path, args.temporal_max, img_trans, pose_trans)
 		elif ds_name == "cl":

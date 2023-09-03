@@ -7,19 +7,22 @@ def get_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--mesh-path", type = str, default = "./meshes/Airway_Phantom_AdjustSmooth.stl")
 	parser.add_argument("--output-path", type = str, default = "./virtual_dataset/single_image")
-	parser.add_argument("--cl-path", type = str, default = "./CL")
+	parser.add_argument("--seg-cl-path", type = str, default = "./CL")
 	parser.add_argument("--img-size", type = int, default = 224)
 	parser.add_argument("--num-samples", type = int, default = 50000)
 	parser.add_argument("--partition", type = str, default = "train")
 	parser.add_argument("--out-pose-only", action = "store_true", default = False)
+	parser.add_argument("--norm-img", action = "store_true", default = False)
 	return parser.parse_args()
 
 def main():
 	args = get_args()
 	output_path = os.path.join(args.output_path, args.partition)
 	os.makedirs(output_path, exist_ok = True)
+	reference_path = os.path.join(args.output_path + "_ref", args.partition)
+	os.makedirs(reference_path, exist_ok = True)
 
-	generate_rotatable_images(args.mesh_path, args.cl_path, output_path, args.num_samples, args.img_size, args.out_pose_only)
+	generate_rotatable_images(args.mesh_path, args.seg_cl_path, output_path, reference_path, args.num_samples, args.img_size, args.out_pose_only, args.norm_img)
 
 if __name__ == '__main__':
 	main()

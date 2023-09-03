@@ -19,7 +19,8 @@ out_path = "./seg_cl_1"
 cl_paths = [os.path.join(cl_path, t_path) for t_path in os.listdir(cl_path) if t_path.endswith(".dat")]
 
 #colour_names = ["aliceblue", "antiquewhite", "aquamarine", "azure", "beige", "bisque", "black", "blue", "blueviolet", "brown", "cadetblue", "chartreuse", "coral", "crimson"]
-colour_names = ["0xFAEBD7", "0x7FFFD4", "0x000000", "0x0000FF", "0x8A2BE2", "0x654321", "0x7FFF00", "0xFF7F50", "0x008B8B", "0xA9A9A9", "0x006400", "0xFF8C00", "0x483D8B", "0xFF1493", "0xADFF2F", "0x808000", "0x008080"]
+#colour_names = ["0xFAEBD7", "0x7FFFD4", "0x000000", "0x0000FF", "0x8A2BE2", "0x654321", "0x7FFF00", "0xFF7F50", "0x008B8B", "0xA9A9A9", "0x006400", "0xFF8C00", "0x483D8B", "0xFF1493", "0xADFF2F", "0x808000", "0x008080"]
+colour_names = ["red", "green", "blue"]
 
 def cl_to_poly(path):
 	points = []

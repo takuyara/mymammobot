@@ -27,6 +27,8 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 
 	true_lbs, pred_lbs = [], []
 
+	wrong_pts = [[], [], []]
+
 	for (imgs_v, poses_v), (imgs_r, poses_r) in zip(dataloaders["virtual"], dataloaders["real"]):
 		with torch.no_grad():
 			#assert torch.abs(poses_v - poses_r).max() < 1e-4
@@ -56,7 +58,7 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 			true_lbs.append(true_lb)
 			pred_lbs.append(pred_lb)
 			if true_lb != pred_lb:
-				only_r_bad.append(metric_template.inv_trans(poses_v.numpy()).reshape(6)[ : 3])
+				wrong_pts[true_lb].append(metric_template.inv_trans(poses_v.numpy()).reshape(6)[ : 3])
 
 			"""
 			te_r, te_v = this_metric_r.get_dict()["translation_error"], this_metric_v.get_dict()["translation_error"]
@@ -89,7 +91,8 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 	
 	#p.add_points(np.stack(both_good, axis = 0), render_points_as_spheres = True, point_size = 10, color = "green")
 	#p.add_points(np.stack(both_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "black")
-	p.add_points(np.stack(only_r_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "red")
+	for points, colour in zip(wrong_pts, ["red", "blue", "green"]):
+		p.add_points(np.stack(points, axis = 0), render_points_as_spheres = True, point_size = 10, color = colour)
 	#p.add_points(np.stack(only_v_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
 	#p.add_points(np.stack(r_preds, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
 	
