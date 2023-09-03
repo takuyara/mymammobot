@@ -5,6 +5,18 @@ import torch.nn.init
 from models.att import AttentionBlock
 from models.model_utils import get_mlp
 
+class ScaleProcess(nn.Module):
+    def __init__(self, num_bins, droprate):
+        super(ScaleProcess, self).__init__()
+        self.num_bins = num_bins
+        self.mlp = get_mlp(num_bins, [16, 1], droprate)[0]
+
+    def forward(self, x):
+        hist = torch.stack([torch.histc(t, bins = self.num_bins, min = 0., max = 1.) for t in torch.unbind(x)], dim = 0)
+        w = self.mlp(hist)
+        w = w.view(-1, 1, 1, 1)
+        return x * w
+
 class FourDirectionalLSTM(nn.Module):
     def __init__(self, seq_size, origin_feat_size, hidden_size):
         super(FourDirectionalLSTM, self).__init__()
@@ -56,10 +68,15 @@ class PoseNet(nn.Module):
 
 
 class AtLoc(nn.Module):
-    def __init__(self, feature_extractor, output_dim = 6, droprate=0.5, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
+    def __init__(self, feature_extractor, output_dim = 6, droprate=0.5, scale_num_bins = 30, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
         super(AtLoc, self).__init__()
         self.droprate = droprate
         self.lstm = lstm
+
+        if scale_num_bins > 0:
+            self.scale_process = ScaleProcess(scale_num_bins, droprate)
+        else:
+            self.scale_process = None
 
         # replace the last FC layer in feature extractor
         self.feature_extractor = feature_extractor
@@ -95,6 +112,9 @@ class AtLoc(nn.Module):
                     nn.init.constant_(m.bias.data, 0)
 
     def forward(self, x, get_encode = False, return_both = False):
+        if self.scale_process is not None:
+            x = self.scale_process(x)
+
         x = self.feature_extractor(x)
         x = F.relu(x)
 

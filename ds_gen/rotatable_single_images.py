@@ -118,6 +118,7 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 
 				cl_pose = np.array([[cl_idx, sum_axial_len + axial_norm, radial_norm, radial_rot]])
 				np.savetxt(os.path.join(output_path, f"{img_idx:06d}_clbase.txt"), cl_pose, fmt = "%.6f")
+				cv2.imwrite(os.path.join(reference_path, f"{img_idx:06d}.png"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
 				if not out_pose_only:
 					if not norm_img:
 						np.save(os.path.join(output_path, f"{img_idx:06d}.npy"), dep)

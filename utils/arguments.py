@@ -33,6 +33,7 @@ def get_base_parser(parser):
 	parser.add_argument("--n-channels", type = int, default = 1)
 	parser.add_argument("--cls", action = "store_true", default = False)
 	parser.add_argument("--seg-cl-path", type = str, default = "./seg_cl_1")
+	parser.add_argument("--scale-num-bins", type = int, default = 0)
 	return parser
 
 def get_r3d_parser(parser):
