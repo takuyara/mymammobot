@@ -185,7 +185,8 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			img = (img - img.min()) / (img.max() - img.min())
 			img = transforms.functional.adjust_gamma(img, 0.6)
 			img = (img - img.min()) / (img.max() - img.min())
-			return img.repeat(n_channels, 1, 1)
+			img = img.repeat(n_channels, 1, 1)
+			return img
 		return img_to_hist_accurate_blur
 
 	elif method == "hist_accurate_blur_jitter":

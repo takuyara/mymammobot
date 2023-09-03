@@ -20,6 +20,7 @@ def train_val(model, dataloaders, optimiser, epochs, loss_fun, metric_template, 
 					#print(imgs.shape, poses_true.shape)
 					#b, s, c, w, h to b, c, s, w, h
 					imgs = imgs.view(-1, *imgs.shape[-3 : ])
+					print(imgs.shape)
 					#print(imgs.shape)
 					poses_pred = model(imgs)
 					if poses_true.dim() > 1:
