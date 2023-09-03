@@ -18,7 +18,10 @@ class SingleImageDataset(Dataset):
 			this_dir = os.path.join(base_dir, this_dir)
 			for path in os.listdir(this_dir):
 				if path.endswith(".txt"):
-					self.samples.append((this_dir, int(path.replace(".txt", ""))))
+					try:
+						self.samples.append((this_dir, int(path.replace(".txt", ""))))
+					except:
+						pass
 		self.transform_img, self.transform_pose = transform_img, transform_pose
 		self.img_size = img_size
 		#self.zoom_gen = randu_gen(0.9, 1.1)
