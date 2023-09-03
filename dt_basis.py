@@ -5,9 +5,12 @@ from torch import optim
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import pyvista as pv
 
 from domain_transfer.transformation import get_simple_loaders, SFS2Mesh, Mesh2SFS
 from utils.preprocess import get_img_transform
+from utils.misc import str_to_arr
+from ds_gen.depth_map_generation import get_depth_map
 
 from torchvision import transforms
 
@@ -33,15 +36,18 @@ def plot_one_batch(model, test_dloader, device):
 
 
 def main():
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
 	paired_paths = []
 	rd_min = vd_min = 1e10
 	rd_max = vd_max = -1e10
-	"""
-	hist_complex_fun = get_img_transform("./data_stats.json", "hist_simple", 1, False)
-	hist_complex_fun_train = get_img_transform("./data_stats.json", "hist_simple", 1, True)
+	fun_val = get_img_transform("./data_stats.json", "hist_accurate", 1, False)
+	fun_train_b = get_img_transform("./data_stats.json", "hist_accurate_blur", 1, True)
+	fun_train = get_img_transform("./data_stats.json", "hist_accurate_blur_tst", 1, True)
 	"""
 	fun = get_img_transform("./data_stats.json", "mesh2sfs", 1, True)
 	fun1 = get_img_transform("./data_stats.json", "sfs", 1, False)
+	"""
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
 		rd_sum, rd_cnt, vd_sum, vd_cnt = np.zeros(40), np.zeros(40), np.zeros(40), np.zeros(40)
@@ -51,6 +57,9 @@ def main():
 				em_idx, img_idx, try_idx = int(row["em_idx"]), int(row["img_idx"]), int(row["try_idx"])
 				real_depth_path = os.path.join("depth-images", f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy")
 				virtual_depth_path = os.path.join("depth-images", f"EM-newfix-{em_idx}-{try_idx}", f"{img_idx:06d}.npy")
+				position = str_to_arr(row["position"])
+				orientation = str_to_arr(row["orientation"])
+				up = str_to_arr(row["up"])
 				paired_paths.append((real_depth_path, virtual_depth_path))
 				if not os.path.exists(real_depth_path):
 					print(f"Real not found: {em_idx}, {img_idx}.")
@@ -59,17 +68,32 @@ def main():
 					print(f"Virtual not found: {em_idx}, {try_idx}, {img_idx}.")
 					continue
 
-				"""
-				rd, vd = np.load(real_depth_path), np.load(virtual_depth_path)
+				rd = np.load(real_depth_path)
+				vd = get_depth_map(p, position, orientation, up, view_angle = 120)
 
-				vd_ = transforms.GaussianBlur(21, 7)(torch.tensor(vd).unsqueeze(0)).numpy()
+				#vd_ = transforms.GaussianBlur(21, 7)(torch.tensor(vd).unsqueeze(0)).numpy()
 
-				rd_t, vd_t = fun1(rd).squeeze().numpy().reshape(224, 224), fun(vd).squeeze().numpy().reshape(224, 224)
+				rd_t, vd_t = fun_val(rd).squeeze().numpy().reshape(224, 224), fun_train(vd).squeeze().numpy().reshape(224, 224)
+				vd_b = fun_train_b(vd).squeeze().numpy().reshape(224, 224)
 				err = np.abs(rd_t - vd_t)
 				range_rate = (vd.max() - vd.min()) / (rd.max() - rd.min())
 				errs.append(np.mean(err))
 				range_rates.append(range_rate)
 
+				plt.subplot(1, 3, 1)
+				plt.imshow(rd_t)
+				#plt.colorbar()
+				plt.subplot(1, 3, 2)
+				plt.imshow(vd_b)
+				#plt.colorbar()
+				plt.subplot(1, 3, 3)
+				plt.imshow(vd_t)
+				#plt.colorbar()
+				plt.suptitle(f"{np.mean((rd_t - vd_t) ** 2):.4f}")
+				plt.show()
+
+
+				"""
 				plt.subplot(2, 2, 1)
 				plt.imshow(rd_t)
 				plt.colorbar()
@@ -80,13 +104,13 @@ def main():
 				plt.imshow(err)
 				plt.colorbar()
 				plt.subplot(2, 2, 4)
-				plt.scatter(rd.ravel(), vd_.ravel())
+				plt.scatter(rd_t.ravel(), vd_t.ravel())
 				plt.suptitle(f"{np.mean((rd_t - vd_t) ** 2):.4f}")
 				plt.show()
 				rd_min, rd_max = min(rd_min, rd.min()), max(rd_max, rd.max())
 				vd_min, vd_max = min(vd_min, vd.min()), max(vd_max, vd.max())
 				"""
-
+				
 	"""
 	plt.scatter(range_rates, errs)
 	print("Mean err = ", np.mean(errs))
