@@ -78,6 +78,7 @@ class AtLoc(nn.Module):
         else:
             self.scale_process = None
 
+        self.batch_norm = nn.BatchNorm2d(n_channels)
         # replace the last FC layer in feature extractor
         self.feature_extractor = feature_extractor
         if n_channels != 3:
@@ -115,6 +116,7 @@ class AtLoc(nn.Module):
         if self.scale_process is not None:
             x = self.scale_process(x)
 
+        x = self.batch_norm(x)
         x = self.feature_extractor(x)
         x = F.relu(x)
 

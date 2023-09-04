@@ -50,7 +50,7 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 					wrong_pts[true_lb].append(this_actual_pose)
 				else:
 					right_pts.append(this_actual_pose)
-				if true_lb == 0:
+				if true_lb in [1, 2] and pred_lb == true_lb:
 					plt.imshow(imgs_r[i].reshape(224, 224))
 					plt.title(pred_lb)
 					plt.show()

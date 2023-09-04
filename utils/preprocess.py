@@ -310,6 +310,8 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			#labels = (labels - mean) / std
 			return torch.tensor(res).float()
 		return img_to_hist_even_more_complex
+	else:
+		raise NotImplementedError
 
 def get_pose_transforms(data_stats_path, hispose_noise, modality):
 	stats = json.load(open(data_stats_path))
