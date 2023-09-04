@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.nn.init
 from models.att import AttentionBlock
 from models.model_utils import get_mlp
+from models.custom_batch_norm import CustomBatchNorm
 
 class ScaleProcess(nn.Module):
     def __init__(self, num_bins, droprate):
@@ -68,7 +69,7 @@ class PoseNet(nn.Module):
 
 
 class AtLoc(nn.Module):
-    def __init__(self, feature_extractor, output_dim = 6, droprate=0.5, scale_num_bins = 30, batchnorm = False, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
+    def __init__(self, feature_extractor, output_dim = 6, droprate=0.5, scale_num_bins = 30, batchnorm = False, custombn = True, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
         super(AtLoc, self).__init__()
         self.droprate = droprate
         self.lstm = lstm
@@ -79,7 +80,7 @@ class AtLoc(nn.Module):
             self.scale_process = None
 
         if batchnorm:
-            self.batch_norm_1 = nn.BatchNorm2d(n_channels)
+            self.batch_norm_1 = nn.BatchNorm2d(n_channels) if not custombn else CustomBatchNorm(n_channels, 2)
         else:
             self.batch_norm_1 = None
 
@@ -92,7 +93,7 @@ class AtLoc(nn.Module):
         self.feature_extractor.fc = nn.Sequential(nn.Linear(fe_out_planes, feat_dim), nn.LeakyReLU(0.2))
 
         if batchnorm:
-            self.batch_norm_2 = nn.BatchNorm1d(feat_dim)
+            self.batch_norm_2 = nn.BatchNorm1d(feat_dim) if not custombn else CustomBatchNorm(feat_dim, 1)
         else:
             self.batch_norm_2 = None
 
