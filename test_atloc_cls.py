@@ -50,10 +50,14 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 					wrong_pts[true_lb].append(this_actual_pose)
 				else:
 					right_pts.append(this_actual_pose)
+				"""
 				if true_lb in [1, 2] and pred_lb == true_lb:
 					plt.imshow(imgs_r[i].reshape(224, 224))
 					plt.title(pred_lb)
 					plt.show()
+				"""
+				if true_lb == 0 and true_lb != pred_lb:
+					print(poses_pred_r[i, ...])
 
 	
 	#p.add_points(np.stack(all_points_true, axis = 0), render_points_as_spheres = True, point_size = 5, color = "red")

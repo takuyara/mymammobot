@@ -91,7 +91,7 @@ def get_models(args, *names):
 			if args.uses_posenet:
 				model = PoseNet(base, output_dim = args.output_dim, droprate = args.dropout, n_channels = args.n_channels).to(device)
 			else:
-				model = AtLoc(base, output_dim = args.output_dim, droprate = args.dropout, scale_num_bins = args.scale_num_bins, feat_dim = args.img_encode_dim, n_channels = args.n_channels).to(device)
+				model = AtLoc(base, output_dim = args.output_dim, droprate = args.dropout, scale_num_bins = args.scale_num_bins, feat_dim = args.img_encode_dim, n_channels = args.n_channels, batchnorm = args.uses_batchnorm).to(device)
 			if t_name.endswith("+"):
 				model.load_state_dict(torch.load(os.path.join(args.save_path, args.atloc_path)))
 		elif t_name.startswith("hisenc"):

@@ -68,7 +68,7 @@ class PoseNet(nn.Module):
 
 
 class AtLoc(nn.Module):
-    def __init__(self, feature_extractor, output_dim = 6, droprate=0.5, scale_num_bins = 30, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
+    def __init__(self, feature_extractor, output_dim = 6, droprate=0.5, scale_num_bins = 30, batchnorm = False, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
         super(AtLoc, self).__init__()
         self.droprate = droprate
         self.lstm = lstm
@@ -78,14 +78,23 @@ class AtLoc(nn.Module):
         else:
             self.scale_process = None
 
-        self.batch_norm = nn.BatchNorm2d(n_channels)
+        if batchnorm:
+            self.batch_norm_1 = nn.BatchNorm2d(n_channels)
+        else:
+            self.batch_norm_1 = None
+
         # replace the last FC layer in feature extractor
         self.feature_extractor = feature_extractor
         if n_channels != 3:
             self.feature_extractor.conv1 = nn.Conv2d(n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
         self.feature_extractor.avgpool = nn.AdaptiveAvgPool2d(1)
         fe_out_planes = self.feature_extractor.fc.in_features
-        self.feature_extractor.fc = nn.Linear(fe_out_planes, feat_dim)
+        self.feature_extractor.fc = nn.Sequential(nn.Linear(fe_out_planes, feat_dim), nn.LeakyReLU(0.2))
+
+        if batchnorm:
+            self.batch_norm_2 = nn.BatchNorm1d(feat_dim)
+        else:
+            self.batch_norm_2 = None
 
         if self.lstm:
             self.lstm4dir = FourDirectionalLSTM(seq_size=32, origin_feat_size=feat_dim, hidden_size=256)
@@ -116,9 +125,11 @@ class AtLoc(nn.Module):
         if self.scale_process is not None:
             x = self.scale_process(x)
 
-        x = self.batch_norm(x)
+        if self.batch_norm_1 is not None
+            x = self.batch_norm_1(x)
         x = self.feature_extractor(x)
-        x = F.relu(x)
+        if self.batch_norm_2 is not None:
+            x = self.batch_norm_2(x)
 
         if self.lstm:
             x = self.lstm4dir(x)
