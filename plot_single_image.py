@@ -49,10 +49,12 @@ def get_points(p, path, idx):
 
 def main():
 	airway = pv.read(airway_path)
-	p = pv.Plotter(off_screen = True, window_size = (224, 224))
-	#p.add_mesh(airway, opacity = 0.5)
-	p.add_mesh(airway)
+	#p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p = pv.Plotter()
+	p.add_mesh(airway, opacity = 0.5)
+	#p.add_mesh(airway)
 
+	"""
 	rgb1 = get_points(p, "./CL1/CL0.dat", 800)
 	rgb2 = get_points(p, "./CL1/CL4.dat", 800)
 	plt.subplot(1, 2, 1)
@@ -60,6 +62,7 @@ def main():
 	plt.subplot(1, 2, 2)
 	plt.imshow(rgb2)
 	plt.show()
+	"""
 
 	em_idx = 0
 	points = []
@@ -67,11 +70,10 @@ def main():
 	ups = []
 
 
-	"""
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
 		for row in reader:
-			if int(row["em_idx"]) == em_idx:
+			if int(row["human_eval"]) == 1:
 				points.append(str_to_arr(row["position"]))
 				orients.append(str_to_arr(row["orientation"]))
 				ups.append(str_to_arr(row["up"]))
@@ -81,15 +83,19 @@ def main():
 
 	gen_points = []
 	gen_orients = []
-	path = "./virtual_dataset/single_image_reduced/val"
+	gen_ups = []
+	path = "./virtual_dataset/pls-sm/val"
 	for tp in os.listdir(path):
-		if tp.endswith(".txt"):
+		if tp.endswith(".txt") and tp.find("clbase") == -1:
 			pose = np.loadtxt(os.path.join(path, tp))
 			gen_points.append(pose[0, ...])
 			gen_orients.append(pose[1, ...])
+			gen_ups.append(pose[2, ...])
 	gen_points = np.stack(gen_points, axis = 0)
 	gen_orients = np.stack(gen_orients, axis = 0)
+	gen_ups = np.stack(gen_ups, axis = 0)
 
+	"""
 	gen_points_t = []
 	gen_orients_t = []
 	path = "./virtual_dataset/single_image_reduced/train"
@@ -103,16 +109,18 @@ def main():
 	"""
 
 
-	"""
 	for i in range(len(points)):
 		p.add_mesh(pv.Arrow(points[i, ...], orients[i, ...]), color = "red")
+		p.add_mesh(pv.Arrow(points[i, ...], ups[i, ...]), color = "blue")
 
 	for i in range(len(gen_points)):
 		p.add_mesh(pv.Arrow(gen_points[i, ...], gen_orients[i, ...]), color = "green")
+		p.add_mesh(pv.Arrow(gen_points[i, ...], gen_ups[i, ...]), color = "yellow")
+	
 	"""
-
 	for path in cl_paths:
 		p.add_mesh(cl_to_poly(path), color = "blue")
+	"""
 
 	#p.add_points(points, render_points_as_spheres = True, point_size = 5, color = "red")
 

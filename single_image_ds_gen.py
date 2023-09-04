@@ -2,21 +2,29 @@ import os
 import argparse
 
 from ds_gen.rotatable_single_images import generate_rotatable_images
+from ds_gen.camera_features import load_from_args
 
 def get_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--mesh-path", type = str, default = "./meshes/Airway_Phantom_AdjustSmooth.stl")
 	parser.add_argument("--output-path", type = str, default = "./virtual_dataset/single_image")
-	parser.add_argument("--seg-cl-path", type = str, default = "./CL")
+	parser.add_argument("--seg-cl-path", type = str, default = "./seg_cl_1")
 	parser.add_argument("--img-size", type = int, default = 224)
 	parser.add_argument("--num-samples", type = int, default = 50000)
 	parser.add_argument("--partition", type = str, default = "train")
 	parser.add_argument("--out-pose-only", action = "store_true", default = False)
 	parser.add_argument("--norm-img", action = "store_true", default = False)
+	parser.add_argument("--velocity-path", type = str, default = "velocity_res.csv")
+	parser.add_argument("--static-stats-path", type = str, default = "./ds_gen/static_distrib.json")
+	parser.add_argument("--focal-length", type = float, default = 50)
+	parser.add_argument("--view-angle", type = float, default = 100)
+
 	return parser.parse_args()
 
 def main():
 	args = get_args()
+	load_from_args(args)
+
 	output_path = os.path.join(args.output_path, args.partition)
 	os.makedirs(output_path, exist_ok = True)
 	reference_path = os.path.join(args.output_path + "_ref", args.partition)

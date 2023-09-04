@@ -40,6 +40,7 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 			poses_pred_r = model(imgs_r)
 			actual_poses = metric_template.inv_trans(poses_v.numpy()).reshape(-1, 6)[ : , : 3]
 			pred_lbs_ = torch.argmax(poses_pred_r, dim = -1)
+			imgs_r = imgs_r.cpu().numpy()
 
 			for i in range(len(actual_poses)):
 				true_lb, pred_lb, this_actual_pose = poses_true_r[i].item(), pred_lbs_[i].item(), actual_poses[i, ...]
@@ -49,6 +50,10 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 					wrong_pts[true_lb].append(this_actual_pose)
 				else:
 					right_pts.append(this_actual_pose)
+				if true_lb == 0:
+					plt.imshow(imgs_r[i].reshape(224, 224))
+					plt.title(pred_lb)
+					plt.show()
 
 	
 	#p.add_points(np.stack(all_points_true, axis = 0), render_points_as_spheres = True, point_size = 5, color = "red")
