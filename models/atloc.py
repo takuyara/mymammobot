@@ -125,7 +125,7 @@ class AtLoc(nn.Module):
         if self.scale_process is not None:
             x = self.scale_process(x)
 
-        if self.batch_norm_1 is not None
+        if self.batch_norm_1 is not None:
             x = self.batch_norm_1(x)
         x = self.feature_extractor(x)
         if self.batch_norm_2 is not None:
