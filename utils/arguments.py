@@ -40,6 +40,7 @@ def get_base_parser(parser):
 	parser.add_argument("--static-stats-path", type = str, default = "./ds_gen/static_distrib.json")
 	parser.add_argument("--focal-length", type = float, default = 50)
 	parser.add_argument("--view-angle", type = float, default = 100)
+	parser.add_argument("--from-scratch", action = "store_true", default = False)
 	return parser
 
 def get_r3d_parser(parser):

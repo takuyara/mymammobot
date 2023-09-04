@@ -83,11 +83,11 @@ def get_models(args, *names):
 	for t_name in names:
 		if t_name.startswith("atloc"):
 			if args.atloc_base == "resnet18":
-				base = models.resnet18(weights = models.ResNet18_Weights.DEFAULT)
+				base = models.resnet18(weights = None if args.from_scratch else models.ResNet18_Weights.DEFAULT)
 			elif args.atloc_base == "resnet34":
-				base = models.resnet34(weights = models.ResNet34_Weights.DEFAULT)
+				base = models.resnet34(weights = None if args.from_scratch else models.ResNet34_Weights.DEFAULT)
 			elif args.atloc_base == "resnet50":
-				base = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
+				base = models.resnet50(weights = None if args.from_scratch else models.ResNet50_Weights.DEFAULT)
 			if args.uses_posenet:
 				model = PoseNet(base, output_dim = args.output_dim, droprate = args.dropout, n_channels = args.n_channels).to(device)
 			else:
