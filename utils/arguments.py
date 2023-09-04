@@ -1,5 +1,7 @@
 import argparse
-hidden_arg_names = ["base_dir", "train_split", "val_split", "batch_size", "epochs", "output_dim", "img_size", "num_workers", "device", "save_path", "data_stats", "mesh_path"]
+from ds_gen.camera_features import load_from_args
+
+hidden_arg_names = ["base_dir", "train_split", "val_split", "batch_size", "epochs", "output_dim", "img_size", "num_workers", "device", "save_path", "data_stats", "mesh_path", "n_channels", "seg_cl_path", "velocity_path", "static_stats_path", "temporal_max", "relative_coef", "model_sel_metric", "model_sel_rot_coef", "hispose_noise"]
 
 def get_base_parser(parser):
 	parser.add_argument("--base-dir", type = str, default = "./depth-images", help = "The base dataset dir.")
@@ -24,8 +26,8 @@ def get_base_parser(parser):
 	parser.add_argument("--model-sel-rot-coef", type = float, default = 0.5, help = "The coefficient applied to rotation error for combined error metric.")
 	parser.add_argument("--relative-coef", type = float, default = 1)
 	parser.add_argument("--temporal-max", type = int, default = 10)
-	parser.add_argument("--train-preprocess", type = str, default = "mesh")
-	parser.add_argument("--val-preprocess", type = str, default = "sfs2mesh")
+	parser.add_argument("--train-preprocess", type = str, default = "hist_accurate_blur")
+	parser.add_argument("--val-preprocess", type = str, default = "hist_accurate")
 	parser.add_argument("--uses-tc", action = "store_true", default = False)
 	parser.add_argument("--val-tc", action = "store_true", default = False)
 	parser.add_argument("--train-gen", action = "store_true", default = False)
@@ -34,6 +36,10 @@ def get_base_parser(parser):
 	parser.add_argument("--cls", action = "store_true", default = False)
 	parser.add_argument("--seg-cl-path", type = str, default = "./seg_cl_1")
 	parser.add_argument("--scale-num-bins", type = int, default = 0)
+	parser.add_argument("--velocity-path", type = str, default = "velocity_res.csv")
+	parser.add_argument("--static-stats-path", type = str, default = "./ds_gen/static_distrib.json")
+	parser.add_argument("--focal-length", type = float, default = 50)
+	parser.add_argument("--view-angle", type = float, default = 100)
 	return parser
 
 def get_r3d_parser(parser):
@@ -102,4 +108,5 @@ def get_args(*reqs):
 	for arg_name, arg_value in vars(args).items():
 		if arg_name not in hidden_arg_names:
 			print(f"{arg_name}: {arg_value}")
+	load_from_args(args)
 	return args

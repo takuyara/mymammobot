@@ -2,11 +2,13 @@ import numpy as np
 import pyvista as pv
 from ds_gen.camera_features import camera_params
 
-def get_depth_map(
-	p, position, orientation, up, get_outputs = False,
-	zoom = 1.0, focal_length = camera_params["focal_length"],
-	view_angle = camera_params["view_angle"], clipping_range = camera_params["clipping_range"]
-	):
+def get_depth_map(p, position, orientation, up, get_outputs = False, zoom = 1.0, focal_length = None, view_angle = None, clipping_range = None):
+	if focal_length is None:
+		focal_length = camera_params["focal_length"]
+	if view_angle is None:
+		view_angle = camera_params["view_angle"]
+	if clipping_range is None:
+		clipping_range = camera_params["clipping_range"]
 	camera = pv.Camera()
 	camera.position = position
 	camera.focal_point = position + focal_length * orientation

@@ -27,7 +27,7 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 
 	true_lbs, pred_lbs = [], []
 
-	wrong_pts = [[], [], []]
+	wrong_pts, right_pts = [[], [], []], []
 
 	for (imgs_v, poses_v), (imgs_r, poses_r) in zip(dataloaders["virtual"], dataloaders["real"]):
 		with torch.no_grad():
@@ -35,55 +35,20 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 			this_metric_v = metric_template.new_copy()
 			this_metric_r = metric_template.new_copy()
 
-			#imgs_v, poses_true_v = imgs_v.to(device).float(), poses_v.to(device).float()
 			imgs_r, poses_true_r = imgs_r.to(device), poses_r.to(device)
 
-			#imgs_r = transforms.Compose([transforms.CenterCrop(190), transforms.Resize(224)])(imgs_r)
-			#b, s, c, w, h to b, c, s, w, h
-			#poses_pred_v = model(imgs_v)
 			poses_pred_r = model(imgs_r)
-			"""
-			loss_v = loss_fun(poses_true_v, poses_pred_v)
-			loss_r = loss_fun(poses_true_r, poses_pred_r)
-			this_metric_v.add_batch(poses_true_v, poses_pred_v)
-			this_metric_r.add_batch(poses_true_r, poses_pred_r)
-			"""
-			#print("Virtual: ", this_metric_v)
-			#print("Real: ", this_metric_r)
-			#errs = torch.abs(imgs_v - imgs_r)
-			#print("Dom error: {:.4f} {:.4f} {:.4f}".format(torch.mean(errs), torch.min(errs), torch.max(errs)))
+			actual_poses = metric_template.inv_trans(poses_v.numpy()).reshape(-1, 6)[ : , : 3]
+			pred_lbs_ = torch.argmax(poses_pred_r, dim = -1)
 
-			true_lb = poses_true_r.item()
-			pred_lb = torch.argmax(poses_pred_r, dim = -1).item()
-			true_lbs.append(true_lb)
-			pred_lbs.append(pred_lb)
-			if true_lb != pred_lb:
-				wrong_pts[true_lb].append(metric_template.inv_trans(poses_v.numpy()).reshape(6)[ : 3])
-
-			"""
-			te_r, te_v = this_metric_r.get_dict()["translation_error"], this_metric_v.get_dict()["translation_error"]
-			dlt_trans = te_r - te_v
-			trans_err_v.append(this_metric_v.get_dict()["translation_error"])
-			trans_err_r.append(this_metric_r.get_dict()["translation_error"])
-			transes.append(dlt_trans)
-			err_means.append(torch.mean(errs).item())
-			err_maxes.append(torch.max(errs).item())
-
-			true_pose = this_metric_v.inv_trans(poses_true_v.cpu().numpy()).reshape(6)[ : 3]
-			real_pred = this_metric_r.inv_trans(poses_pred_r.cpu().numpy()).reshape(6)[ : 3]
-			virtual_pred = this_metric_v.inv_trans(poses_pred_v.cpu().numpy()).reshape(6)[ : 3]
-
-			if te_r < bad_thres and te_v < bad_thres:
-				both_good.append(true_pose)
-			elif te_r >= bad_thres and te_v >= bad_thres:
-				both_bad.append(true_pose)
-			elif te_r >= bad_thres:
-				only_r_bad.append(true_pose)
-				r_preds.append(real_pred)
-				v_preds.append(virtual_pred)
-			else:
-				only_v_bad.append(true_pose)
-			"""
+			for i in range(len(actual_poses)):
+				true_lb, pred_lb, this_actual_pose = poses_true_r[i].item(), pred_lbs_[i].item(), actual_poses[i, ...]
+				true_lbs.append(true_lb)
+				pred_lbs.append(pred_lb)
+				if true_lb != pred_lb:
+					wrong_pts[true_lb].append(this_actual_pose)
+				else:
+					right_pts.append(this_actual_pose)
 
 	
 	#p.add_points(np.stack(all_points_true, axis = 0), render_points_as_spheres = True, point_size = 5, color = "red")
@@ -93,7 +58,7 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 	#p.add_points(np.stack(both_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "black")
 	for points, colour in zip(wrong_pts, ["red", "blue", "green"]):
 		p.add_points(np.stack(points, axis = 0), render_points_as_spheres = True, point_size = 10, color = colour)
-	#p.add_points(np.stack(only_v_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
+	p.add_points(np.stack(right_pts, axis = 0), render_points_as_spheres = True, point_size = 10, color = "black")
 	#p.add_points(np.stack(r_preds, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
 	
 	mat = confusion_matrix(true_lbs, pred_lbs)
@@ -148,7 +113,7 @@ def main():
 	p.add_mesh(pv.read(args.mesh_path), opacity = 0.5)
 
 	ald = {}
-	args.batch_size = 1
+	args.batch_size = 128
 	args.val_gen = False
 	args.val_preprocess = "hist_accurate"
 	args.cls = True

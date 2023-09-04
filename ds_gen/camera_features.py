@@ -14,12 +14,19 @@ camera_params["forward_direction"] = np.array([0, 0, 1])
 camera_params["clipping_range"] = (3, 100)
 
 rotation_velocity_list = []
-with open("velocity_res.csv", newline = "") as f:
-	reader = csv.DictReader(f)
-	for row in reader:
-		rotation_velocity_list.append(str_to_arr(row["rotation_velocity"]))
+static_stats = {}
 
-static_stats = json.load(open("./ds_gen/static_distrib.json"))
+def load_from_args(args):
+	global camera_params
+	global rotation_velocity_list
+	global static_stats
+	with open(args.velocity_path, newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in reader:
+			rotation_velocity_list.append(str_to_arr(row["rotation_velocity"]))
+	static_stats = json.load(open(args.static_stats_path))
+	camera_params["focal_length"] = args.focal_length
+	camera_params["view_angle"] = args.view_angle
 
 # Velocity
 # Velocity norm

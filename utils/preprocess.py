@@ -20,7 +20,10 @@ def load_img_pose(base_path, idx, plotter):
 		img = get_depth_map(plotter, *pose_tup)
 	else:
 		img = np.load(os.path.join(base_path, f"{idx:06d}.npy"))
-	img = np.nan_to_num(img, nan = 200)
+	if np.all(np.isnan(img)):
+		img = np.random.randn(img.shape) * 0.01
+	else:
+		img = np.nan_to_num(img, nan = img.max())
 	pose = camera_pose_to_train_pose(*pose_tup)
 	pose = get_6dof_pose_label(pose)
 	return img, torch.tensor(pose)
@@ -36,14 +39,10 @@ def random_rotate_camera(img, pose, img_size, plotter = None, deg = 0, zoom_scal
 		assert deg == 0
 	else:
 		img = get_depth_map(plotter, position, orientation, up, zoom = zoom_scale)
-	
-	"""
-	if np.any(np.isnan(img)):
-		img = np.zeros_like(img)
-		print("Replaced")
-	if np.any(np.isnan(img)):
-		print("FUCK")
-	"""
+	if np.all(np.isnan(img)):
+		img = np.random.randn(img.shape) * 0.01
+	else:
+		img = np.nan_to_num(img, nan = img.max())
 	pose = camera_pose_to_train_pose(position, orientation, up)
 	return img, pose
 
@@ -173,8 +172,12 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 		return img_to_hist_accurate
 	elif method == "hist_accurate_blur":
 		def img_to_hist_accurate_blur(img):
+			if np.any(np.isnan(img)):
+				print("Fuck NAN")
 			img = torch.tensor(img).float().unsqueeze(0)
 			img = transforms.GaussianBlur(21, 7)(img)
+			if img.max() == img.min():
+				print(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			return img.repeat(n_channels, 1, 1)
 		return img_to_hist_accurate_blur
