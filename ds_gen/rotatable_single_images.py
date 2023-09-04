@@ -62,6 +62,11 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 			#num_samples_on_this_cl = int(round(axial_len / total_cl_len * num_samples))
 			num_samples_on_this_cl = int(num_samples / len(all_cls) / (len(points) - 1))
 
+			if cl_idx == 0:
+				num_samples_on_this_cl = int(1.5 * num_samples_on_this_cl)
+			elif sum_axial_len > 100:
+				num_samples_on_this_cl = 0
+
 			#print(cl_orientation)
 
 			for i in range(num_samples_on_this_cl):
@@ -118,11 +123,11 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 
 				cl_pose = np.array([[cl_idx, sum_axial_len + axial_norm, radial_norm, radial_rot]])
 				np.savetxt(os.path.join(output_path, f"{img_idx:06d}_clbase.txt"), cl_pose, fmt = "%.6f")
-				cv2.imwrite(os.path.join(reference_path, f"{img_idx:06d}.png"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+				#cv2.imwrite(os.path.join(reference_path, f"{img_idx:06d}.png"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
 				if not out_pose_only:
 					if not norm_img:
 						np.save(os.path.join(output_path, f"{img_idx:06d}.npy"), dep)
-						cv2.imwrite(os.path.join(reference_path, f"{img_idx:06d}.png"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+						#cv2.imwrite(os.path.join(reference_path, f"{img_idx:06d}.png"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
 					else:
 						dep = ((dep - np.min(dep)) / (np.max(dep) - np.min(dep))).astype(np.float32)
 						Image.fromarray(dep).save(os.path.join(output_path, f"{img_idx:06d}.tif"))

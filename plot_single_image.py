@@ -88,9 +88,13 @@ def main():
 	for tp in os.listdir(path):
 		if tp.endswith(".txt") and tp.find("clbase") == -1:
 			pose = np.loadtxt(os.path.join(path, tp))
-			gen_points.append(pose[0, ...])
-			gen_orients.append(pose[1, ...])
-			gen_ups.append(pose[2, ...])
+			pose_1 = np.loadtxt(os.path.join(path, tp.replace(".txt", "_clbase.txt")))
+			cl_offset = pose_1[1]
+			if cl_offset < 100:
+				gen_points.append(pose[0, ...])
+				gen_orients.append(pose[1, ...])
+				gen_ups.append(pose[2, ...])
+
 	gen_points = np.stack(gen_points, axis = 0)
 	gen_orients = np.stack(gen_orients, axis = 0)
 	gen_ups = np.stack(gen_ups, axis = 0)
@@ -108,7 +112,7 @@ def main():
 	gen_orients_t = np.stack(gen_orients_t, axis = 0)
 	"""
 
-
+	"""
 	for i in range(len(points)):
 		p.add_mesh(pv.Arrow(points[i, ...], orients[i, ...]), color = "red")
 		p.add_mesh(pv.Arrow(points[i, ...], ups[i, ...]), color = "blue")
@@ -116,16 +120,17 @@ def main():
 	for i in range(len(gen_points)):
 		p.add_mesh(pv.Arrow(gen_points[i, ...], gen_orients[i, ...]), color = "green")
 		p.add_mesh(pv.Arrow(gen_points[i, ...], gen_ups[i, ...]), color = "yellow")
+	"""
 	
 	"""
 	for path in cl_paths:
 		p.add_mesh(cl_to_poly(path), color = "blue")
 	"""
 
-	#p.add_points(points, render_points_as_spheres = True, point_size = 5, color = "red")
+	p.add_points(points, render_points_as_spheres = True, point_size = 5, color = "red")
 
 	#p.add_points(gen_points_t, render_points_as_spheres = True, point_size = 5, color = "yellow")
-	#p.add_points(gen_points, render_points_as_spheres = True, point_size = 5, color = "green")
+	p.add_points(gen_points, render_points_as_spheres = True, point_size = 5, color = "green")
 	p.show()
 
 if __name__ == '__main__':

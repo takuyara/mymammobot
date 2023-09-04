@@ -7,8 +7,8 @@ from utils.misc import randu_gen, str_to_arr
 
 # Camera parameters
 camera_params = {}
-camera_params["focal_length"] = 50
-camera_params["view_angle"] = 100
+camera_params["focal_length"] = 100
+camera_params["view_angle"] = 90
 camera_params["up_direction"] = np.array([0, 1, 0])
 camera_params["forward_direction"] = np.array([0, 0, 1])
 camera_params["clipping_range"] = (3, 100)
@@ -53,7 +53,7 @@ def static_focal_radial_offset_gen(radius):
 		return np.random.choice(distrib)
 	return fun
 	"""
-	return randu_gen(0, radius * 0.3)
+	return randu_gen(0, radius * 0.1)
 
 def dynamic_total_velocity_gen(radius):
 	return randu_gen(0, 10)
