@@ -22,6 +22,7 @@ def get_args():
 	parser.add_argument("--lr", type = float, default = 1e-4)
 	parser.add_argument("--save-path", type = str, default = "./checkpoints")
 	parser.add_argument("--model-type", type = str, default = "resnet")
+	parser.add_argument("--dropout", type = float, default = 0.4)
 	return parser.parse_args()
 
 def get_transform(training, n_channels):
@@ -57,7 +58,7 @@ def main():
 			model.conv1 = nn.Conv2d(args.n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
 		model.fc = nn.Linear(model.fc.in_features, args.num_classes)
 	else:
-		model = models.swin_t(weights = models.Swin_T_Weights.DEFAULT)
+		model = models.swin_t(weights = models.Swin_T_Weights.DEFAULT, dropout = args.dropout)
 		if args.n_channels != 3:
 			model.features[0][0] = nn.Conv2d(args.n_channels, 96, kernel_size = 4, stride = 4)
 		model.head = nn.Linear(model.head.in_features, args.num_classes)
