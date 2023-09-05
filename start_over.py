@@ -37,7 +37,7 @@ def get_transform(training, n_channels, cap):
 		if training:
 			img = transforms.GaussianBlur(21, 7)(img)
 			img = torch.minimum(img, torch.tensor(cap))
-		img = transforms.Resize(100)(img)
+		img = transforms.Resize(224)(img)
 		img = (img - img.min()) / (img.max() - img.min())
 		return img.repeat(n_channels, 1, 1)
 	return fun
@@ -91,7 +91,7 @@ def main():
 			model.conv1 = nn.Conv2d(args.n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
 		model.fc = nn.Linear(model.fc.in_features, args.num_classes)
 	else:
-		model = models.swin_t(weights = models.Swin_T_Weights.DEFAULT, dropout = args.dropout)
+		model = models.swin_v2_t(weights = models.Swin_V2_T_Weights.DEFAULT, dropout = args.dropout)
 		if args.n_channels != 3:
 			model.features[0][0] = nn.Conv2d(args.n_channels, 96, kernel_size = 4, stride = 4)
 		model.head = nn.Linear(model.head.in_features, args.num_classes)
