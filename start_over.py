@@ -7,17 +7,6 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 from sklearn.metrics import accuracy_score, f1_score
-from tqdm import tqdm
-
-"""
-class ImageDataset(torch.utils.Dataset):
-	def __init__(self, paths, transform_img):
-		self.transform_img = transform_img
-		for this_path in self.paths:
-			for npy_path in os.listdir(this_path):
-				if npy_path.endswith(".npy"):
-					img = np.load(npy_path)
-"""
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -32,6 +21,7 @@ def get_args():
 	parser.add_argument("--batch-size", type = int, default = 32)
 	parser.add_argument("--lr", type = float, default = 1e-4)
 	parser.add_argument("--save-path", type = str, default = "./checkpoints")
+	parser.add_argument("--model-type", type = str, default = "resnet")
 	return parser.parse_args()
 
 def get_transform(training, n_channels):
@@ -61,10 +51,16 @@ def main():
 	print("Val load done.", flush = True)
 	train_loader = DataLoader(train_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = True)
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
-	model = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
-	if args.n_channels != 3:
-		model.conv1 = nn.Conv2d(args.n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
-	model.fc = nn.Linear(model.fc.in_features, args.num_classes)
+	if args.model_type == "resnet":
+		model = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
+		if args.n_channels != 3:
+			model.conv1 = nn.Conv2d(args.n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
+		model.fc = nn.Linear(model.fc.in_features, args.num_classes)
+	else:
+		model = models.swin_t(weights = models.Swin_T_Weights.DEFAULT)
+		if args.n_channels != 3:
+			model.features[0][0] = nn.Conv2d(args.n_channels, 96, kernel_size = 4, stride = 4)
+		model.head = nn.Linear(model.head.in_features, args.num_classes)
 	model = model.to(args.device)
 	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr)
 	max_acc = 0
@@ -76,7 +72,7 @@ def main():
 				model.eval()
 			y_true, y_pred = [], []
 			sum_loss = num_loss = 0
-			for imgs, labels in tqdm(loader):
+			for imgs, labels in loader:
 				imgs, labels = imgs.to(args.device).float(), labels.to(args.device).long()
 				with torch.set_grad_enabled(phase == "train"):
 					logits = model(imgs)
