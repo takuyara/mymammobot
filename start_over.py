@@ -6,6 +6,7 @@ import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 from torchvision import models, transforms
 from sklearn.metrics import accuracy_score, f1_score
+from tqdm import tqdm
 
 """
 class ImageDataset(torch.utils.Dataset):
@@ -43,7 +44,7 @@ def get_transform(training, n_channels):
 def get_dataset(paths, transform_img):
 	img_list, label_list = [], []
 	for this_path in paths:
-		for npy_path in os.listdir(this_path):
+		for npy_path in tqdm(os.listdir(this_path)):
 			if npy_path.endswith(".npy"):
 				npy_path = os.path.join(this_path, npy_path)
 				img = transform_img(np.load(npy_path))
@@ -56,7 +57,9 @@ def get_dataset(paths, transform_img):
 def main():
 	args = get_args()
 	train_set = get_dataset([os.path.join(args.base_path, ts) for ts in args.train_split], get_transform(True, args.n_channels))
+	print("Train load done.", flush = True)
 	val_set = get_dataset([os.path.join(args.base_path, ts) for ts in args.val_split], get_transform(False, args.n_channels))
+	print("Val load done.", flush = True)
 	train_loader = DataLoader(train_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = True)
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	model = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
@@ -73,12 +76,13 @@ def main():
 				model.eval()
 			y_true, y_pred = [], []
 			sum_loss = num_loss = 0
-			for imgs, labels in loader:
-				imgs, labels = imgs.to(args.device), labels.to(args.device)
+			for imgs, labels in tqdm(loader):
+				imgs, labels = imgs.to(args.device).float(), labels.to(args.device)
 				with torch.set_grad_enabled(phase == "train"):
-					optimiser.zero_grad()
 					logits = model(imgs)
 					loss = nn.CrossEntropyLoss()(logits, labels)
+				if phase == "train":
+					optimiser.zero_grad()
 					loss.backward()
 					optimiser.step()
 				sum_loss += loss.item() * imgs.size(0)
