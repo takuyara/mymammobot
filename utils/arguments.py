@@ -43,6 +43,13 @@ def get_base_parser(parser):
 	parser.add_argument("--from-scratch", action = "store_true", default = False)
 	parser.add_argument("--uses-batchnorm", action = "store_true", default = False)
 	parser.add_argument("--custom-bn", action = "store_true", default = False)
+	parser.add_argument("-wd", "--weight-decay", type = float, default = 1e-5)
+	parser.add_argument("--beta1", type = float, default = 0.9)
+	parser.add_argument("--beta2", type = float, default = 0.999)
+	parser.add_argument("--crop-size", type = int, default = 224)
+	parser.add_argument("--blur-kernel", type = int, default = 21)
+	parser.add_argument("--blur-sigma", type = float, default = 8)
+	parser.add_argument("--downsample-size", type = int, default = 224)
 	return parser
 
 def get_r3d_parser(parser):

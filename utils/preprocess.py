@@ -91,7 +91,7 @@ def cv2_clipped_zoom(img, zoom_factor=0):
 	return result
 
 
-def get_img_transform(data_stats_path, method, n_channels, train):
+def get_img_transform(data_stats_path, method, n_channels, train, args):
 	stats = json.load(open(data_stats_path))
 	if method in ["sfs2mesh", "mesh2sfs", "sfs", "mesh"]:
 		if method in ["sfs2mesh", "mesh"]:
@@ -108,7 +108,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 		def reshape_n_norm(img):
 			img = torch.tensor(img).float().unsqueeze(0)
 			if method == "mesh2sfs":
-				img = transforms.GaussianBlur(21, 7)(img)
+				img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
 			img = img * _w + _b
 			#img = (img - img_mean) / img_std
 			return img.repeat(n_channels, 1, 1)
@@ -159,7 +159,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 	elif method == "hist_simple_blur":
 		def img_to_hist_simple_blur(img, bins = 30):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 7)(img)
+			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = torch.floor(img * bins) / bins
 			return img.repeat(n_channels, 1, 1)
@@ -175,7 +175,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 			if np.any(np.isnan(img)):
 				print("Fuck NAN")
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 7)(img)
+			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
 			if img.max() == img.min():
 				print(img)
 			img = (img - img.min()) / (img.max() - img.min())
@@ -184,7 +184,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 	elif method == "hist_accurate_blur_adv":
 		def img_to_hist_accurate_blur(img):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 7)(img)
+			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img + torch.randn_like(img) * 0.05
 			img = (img - img.min()) / (img.max() - img.min())
@@ -193,7 +193,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 	elif method == "hist_accurate_blur_tst":
 		def img_to_hist_accurate_blur(img):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 7)(img)
+			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = transforms.functional.adjust_gamma(img, 0.6)
 			img = (img - img.min()) / (img.max() - img.min())
@@ -203,7 +203,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 	elif method == "hist_accurate_blur_crop":
 		def img_to_hist_accurate_blur(img):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 7)(img)
+			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
 			img = transforms.CenterCrop(180)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
@@ -220,8 +220,9 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 	elif method == "hist_accurate_blur_resize":
 		def img_to_hist_accurate_blur(img):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 7)(img)
-			img = transforms.Resize(100)(img)
+			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
+			img = transforms.CenterCrop(args.crop_size)(img)
+			img = transforms.Resize(args.downsample_size)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
 			return img
@@ -229,14 +230,15 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 	elif method == "hist_accurate_resize":
 		def img_to_hist_accurate_blur(img):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.Resize(100)(img)
+			img = transforms.CenterCrop(args.crop_size)(img)
+			img = transforms.Resize(args.downsample_size)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
 			return img
 		return img_to_hist_accurate_blur
 
 	elif method == "hist_accurate_blur_jitter":
-		blur = transforms.GaussianBlur(21, 7)
+		blur = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)
 		color_jitter = transforms.ColorJitter(brightness = 0.1, contrast = [0.7, 1.1], saturation = 0, hue = 0)
 		def img_to_hist_accurate_blur_jitter(img):
 			img = torch.tensor(img).float().unsqueeze(0)
@@ -248,7 +250,7 @@ def get_img_transform(data_stats_path, method, n_channels, train):
 	elif method == "small_01_blur":
 		def fun(img):
 			img = torch.tensor(img).float().unsqueeze(0)
-			img = transforms.GaussianBlur(21, 7)(img)
+			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
 			img = transforms.Resize(112)(img)

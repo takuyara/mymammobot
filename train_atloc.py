@@ -43,7 +43,7 @@ def main():
 	train_set, val_set = "preload", "preload"
 	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = [train_set, val_set])
 	model, device = get_models(args, "atloc")
-	optimiser = optim.Adam([p for p in model.parameters()] + [p for p in loss_fun.parameters()], lr = args.learning_rate)
+	optimiser = optim.Adam([p for p in model.parameters()] + [p for p in loss_fun.parameters()], lr = args.learning_rate, weight_decay = args.weight_decay, betas = (args.beta1, args.beta2))
 	min_loss, min_epoch, best_state_dict = train_val(model, dataloaders, optimiser, args.epochs, loss_fun, metric_template, device)
 	torch.save(best_state_dict, os.path.join(args.save_path, f"atloc_{min_loss:.5f}.pth"))
 

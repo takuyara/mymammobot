@@ -124,16 +124,20 @@ def main():
 	ald = {}
 	args.batch_size = 128
 	args.val_gen = False
-	args.val_preprocess = "hist_accurate"
+	args.val_preprocess = "hist_accurate_resize"
 	args.cls = True
-	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["single", "single"])
+	args.train_split = "train"
+	args.val_split = "val"
+	args.base_dir = "./"
+	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["preload", "preload"])
 	ald["real"] = dataloaders["val"]
 	"""
 	args.val_gen = True
 	args.val_preprocess = "hist_accurate_blur"
 	"""
 	args.cls = False
-	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["single", "single"])
+	args.val_split = "real_confirmed.txt"
+	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = ["preload", "single"])
 	ald["virtual"] = dataloaders["val"]
 	model, device = get_models(args, "atloc+")
 	train_val(p, model, ald, loss_fun, metric_template, device)
