@@ -223,7 +223,7 @@ def get_img_transform(data_stats_path, method, n_channels, train, args):
 			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
 			img = transforms.CenterCrop(args.crop_size)(img)
 			img = transforms.Resize(args.downsample_size)(img)
-			img = torch.maximum(img, torch.tensor(args.trunc_depth))
+			img = torch.minimum(img, torch.tensor(args.trunc_depth))
 			img = (img - img.min()) / (img.max() - img.min())
 			img = img.repeat(n_channels, 1, 1)
 			return img
