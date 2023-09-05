@@ -57,7 +57,7 @@ class PreloadDataset(Dataset):
 		"""
 
 	def __getitem__(self, idx):
-		lb = self.label_data[idx, 0]
+		lb = int(self.label_data[idx, 0])
 		img = self.transform(self.img_data[idx, ...])
 		if self.binary:
 			lb = 0 if lb == 0 else 1
