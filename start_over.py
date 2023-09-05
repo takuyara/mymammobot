@@ -3,7 +3,7 @@ import torch
 import argparse
 from torch import nn
 import numpy as np
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 from sklearn.metrics import accuracy_score, f1_score
 from tqdm import tqdm
@@ -21,8 +21,8 @@ class ImageDataset(torch.utils.Dataset):
 def get_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--base-path", type = str, default = "./")
-	parser.add_argument("--train-split", type = str, nargs = "+", default = ["virtual_dataset/full/train"])
-	parser.add_argument("--val-split", type = str, nargs = "+", default = ["real_dataset/confirmed/real-0", "real_dataset/confirmed/real-1", "real_dataset/confirmed/real-2"])
+	parser.add_argument("--train-path", type = str, default = "train")
+	parser.add_argument("--val-path", type = str, default = "val")
 	parser.add_argument("-nw", "--num-workers", type = int, default = 0)
 	parser.add_argument("--device", type = str, default = "cuda")
 	parser.add_argument("--n-channels", type = int, default = 1)
@@ -41,24 +41,21 @@ def get_transform(training, n_channels):
 		return img.repeat(n_channels, 1, 1)
 	return fun
 
-def get_dataset(paths, transform_img):
-	img_list, label_list = [], []
-	for this_path in paths:
-		for npy_path in tqdm(os.listdir(this_path)):
-			if npy_path.endswith(".npy"):
-				npy_path = os.path.join(this_path, npy_path)
-				img = transform_img(np.load(npy_path))
-				label = int(np.loadtxt(npy_path.replace(".npy", "_clbase.txt")).ravel()[0])
-				img_list.append(img)
-				label_list.append(torch.tensor(label))
-	img_list, label_list = torch.stack(img_list, dim = 0), torch.stack(label_list, dim = 0)
-	return TensorDataset(img_list, label_list)
+class PreloadDataset(Dataset):
+	def __init__(self, img_path, label_path, transform):
+		self.img_data = np.load(img_path)
+		self.label_data = np.load(label_path)
+		self.transform = transform
+	def __getitem__(self, idx):
+		return self.transform(self.img_data[idx, ...]), self.label_data[idx, ...]
+	def __len__(self):
+		return len(self.img_data)
 
 def main():
 	args = get_args()
-	train_set = get_dataset([os.path.join(args.base_path, ts) for ts in args.train_split], get_transform(True, args.n_channels))
+	train_set = PreloadDataset(os.path.join(args.base_path, f"{args.train_path}_img.npy"), os.path.join(args.base_path, f"{args.train_path}_label.npy"), get_transform(True, args.n_channels))
 	print("Train load done.", flush = True)
-	val_set = get_dataset([os.path.join(args.base_path, ts) for ts in args.val_split], get_transform(False, args.n_channels))
+	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args.n_channels))
 	print("Val load done.", flush = True)
 	train_loader = DataLoader(train_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = True)
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
@@ -77,7 +74,7 @@ def main():
 			y_true, y_pred = [], []
 			sum_loss = num_loss = 0
 			for imgs, labels in tqdm(loader):
-				imgs, labels = imgs.to(args.device).float(), labels.to(args.device)
+				imgs, labels = imgs.to(args.device).float(), labels.to(args.device).long()
 				with torch.set_grad_enabled(phase == "train"):
 					logits = model(imgs)
 					loss = nn.CrossEntropyLoss()(logits, labels)
