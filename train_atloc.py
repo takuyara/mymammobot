@@ -38,8 +38,9 @@ def train_val(model, dataloaders, optimiser, epochs, loss_fun, metric_template, 
 
 def main():
 	args = get_args("atloc")
-	train_set = "single_tc" if args.uses_tc else "single"
-	val_set = "single_tc" if args.uses_tc and args.val_tc else "single"
+	#train_set = "single_tc" if args.uses_tc else "single"
+	#val_set = "single_tc" if args.uses_tc and args.val_tc else "single"
+	train_set, val_set = "preload", "preload"
 	dataloaders, loss_fun, metric_template = get_loaders_loss_metrics(args, dset_names = [train_set, val_set])
 	model, device = get_models(args, "atloc")
 	optimiser = optim.Adam([p for p in model.parameters()] + [p for p in loss_fun.parameters()], lr = args.learning_rate)

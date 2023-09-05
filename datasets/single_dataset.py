@@ -64,3 +64,23 @@ class SingleImageDataset(Dataset):
 		if self.transform_pose is not None:
 			pose = self.transform_pose(pose, True)
 		return img, pose
+
+
+class PreloadDataset(Dataset):
+	def __init__(self, base_dir, dir_list, img_size, mesh_path, convert_to_clbase, transform_img, transform_pose):
+		super(PreloadDataset, self).__init__()
+		self.imgs = np.load(os.path.join(base_dir, f"{dir_list}_img.npy"))
+		self.labels = np.load(os.path.join(base_dir, f"{dir_list}_label.npy"))
+		self.transform_img, self.transform_pose = transform_img, transform_pose
+		self.img_size = img_size
+		
+	def __len__(self):
+		return len(self.imgs)
+
+	def __getitem__(self, idx):
+		img, pose = self.imgs[idx, ...], int(self.labels[idx, ...])		
+		if self.transform_img is not None:
+			img = self.transform_img(img)
+		if self.transform_pose is not None:
+			pose = self.transform_pose(pose, True)
+		return img, pose
