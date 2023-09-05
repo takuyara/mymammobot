@@ -2,6 +2,7 @@ import os
 import torch
 import argparse
 from torch import nn
+from copy import deepcopy
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
@@ -30,6 +31,7 @@ def get_args():
 	parser.add_argument("--epochs", type = int, default = 30)
 	parser.add_argument("--batch-size", type = int, default = 32)
 	parser.add_argument("--lr", type = float, default = 1e-4)
+	parser.add_argument("--save-path", type = str, default = "./checkpoints")
 	return parser.parse_args()
 
 def get_transform(training, n_channels):
@@ -65,6 +67,7 @@ def main():
 	model.fc = nn.Linear(model.fc.in_features, args.num_classes)
 	model = model.to(args.device)
 	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr)
+	max_acc = 0
 	for epoch in range(args.epochs):
 		for phase, loader in [("train", train_loader), ("val", val_loader)]:
 			if phase == "train":
@@ -88,7 +91,11 @@ def main():
 				y_true.append(labels.cpu().numpy())
 				y_pred.append(preds.cpu().numpy())
 			y_true, y_pred = np.concatenate(y_true, axis = 0), np.concatenate(y_pred, axis = 0)
-			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}".format(epoch, phase, sum_loss / num_loss, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro")), flush = True)
+			loss, acc, f1 = sum_loss / num_loss, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro")
+			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}".format(epoch, phase, loss, acc, f1), flush = True)
+			if phase == "val" and acc > max_acc:
+				max_acc, best_weights = acc, deepcopy(model.state_dict())
+	torch.save(best_weights, os.path.join(args.save_path, f"ckpt-{max_acc:.4f}.pt"))
 
 if __name__ == '__main__':
 	main()
