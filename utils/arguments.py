@@ -51,6 +51,7 @@ def get_base_parser(parser):
 	parser.add_argument("--blur-sigma", type = float, default = 7)
 	parser.add_argument("--trunc-depth", type = float, default = 200)
 	parser.add_argument("--downsample-size", type = int, default = 224)
+	parser.add_argument("--reg-dim", type = int, default = 1)
 	return parser
 
 def get_r3d_parser(parser):

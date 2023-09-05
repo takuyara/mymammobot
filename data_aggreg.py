@@ -6,12 +6,14 @@ def get_data(paths, prefix):
 		for npy_path in os.listdir(this_path):
 			if npy_path.endswith(".npy"):
 				npy_path = os.path.join(this_path, npy_path)
-				img = np.load(npy_path)
-				label = int(np.loadtxt(npy_path.replace(".npy", "_clbase.txt")).ravel()[0])
-				img_list.append(img)
+				#img = np.load(npy_path)
+				label = np.loadtxt(npy_path.replace(".npy", "_clbase.txt")).ravel()[ : 2]
+				#img_list.append(img)
 				label_list.append(label)
-	img_list, label_list = np.stack(img_list, axis = 0), np.stack(label_list, axis = 0)
-	np.save(f"{prefix}_img.npy", img_list)
+	#img_list, label_list = np.stack(img_list, axis = 0), np.stack(label_list, axis = 0)
+	label_list = np.stack(label_list, axis = 0)
+	label_list[ : , 1] = label_list[ : , 1] / 107
+	#np.save(f"{prefix}_img.npy", img_list)
 	np.save(f"{prefix}_label.npy", label_list)
 
 get_data(["virtual_dataset/full/train"], "train")

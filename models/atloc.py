@@ -69,7 +69,7 @@ class PoseNet(nn.Module):
 
 
 class AtLoc(nn.Module):
-    def __init__(self, feature_extractor, output_dim = 6, droprate=0.5, scale_num_bins = 30, batchnorm = False, custombn = True, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
+    def __init__(self, feature_extractor, output_dim = 6, reg_dim = 1, droprate=0.5, scale_num_bins = 30, batchnorm = False, custombn = True, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False):
         super(AtLoc, self).__init__()
         self.droprate = droprate
         self.lstm = lstm
@@ -115,11 +115,12 @@ class AtLoc(nn.Module):
         self.fc_xyz = nn.Linear(fc_in_dim, 3)
         self.fc_wpqr = nn.Linear(fc_in_dim, 3)
         """
-        self.fc = nn.Linear(fc_in_dim, output_dim)
+        self.fc_cls = nn.Linear(fc_in_dim, output_dim)
+        self.fc_reg = nn.Sequential(nn.Linear(fc_in_dim, reg_dim), nn.Sigmoid())
 
         # initialize
         if pretrained:
-            init_modules = [self.feature_extractor.fc, self.fc]
+            init_modules = [self.feature_extractor.fc, self.fc_cls, self.fc_reg]
         else:
             init_modules = self.modules()
 
@@ -152,14 +153,15 @@ class AtLoc(nn.Module):
         wpqr = self.fc_wpqr(x)
         out = torch.cat((xyz, wpqr), 1)
         """
-        out = self.fc(x)
+        out_cls = self.fc_cls(x)
+        out_reg = self.fc_reg(x)
         if get_encode:
             if return_both:
-                return x, out
+                return x, out_cls, out_reg
             else:
                 return x
         else:
-            return out
+            return out_cls, out_reg
 
 class AtLocPlus(nn.Module):
     def __init__(self, atlocplus):

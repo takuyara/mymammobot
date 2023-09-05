@@ -39,6 +39,17 @@ class TCLoss(nn.Module):
 			loss += self.relative_coef * self.base_loss(inputs_rela, targets_rela)
 		return loss
 
+class CombineLoss(nn.Module):
+	def __init__(self, balance_rate = 1.):
+		super(CombineLoss, self).__init__()
+		self.cls_loss = nn.CrossEntropyLoss()
+		self.reg_loss = nn.MSELoss()
+		self.balance_rate = balance_rate
+	def forward(self, inputs, targets):
+		cls_input, reg_input = inputs
+		cls_target, reg_target = targets
+		return self.cls_loss(cls_input, cls_target) + self.balance_rate * self.reg_loss(reg_input, reg_target)
+
 class Metrics_Cls:
 	def __init__(self, loss_fun, inv_trans, main_metric, rot_coef = None):
 		assert main_metric in ["loss", "trans_err", "rot_err", "comb_err"]
@@ -52,6 +63,8 @@ class Metrics_Cls:
 		self.rot_errors = []
 		self.inp_lbs = []
 		self.tgt_lbs = []
+		self.inp_regs = []
+		self.tgt_regs = []
 	def new_copy(self):
 		return Metrics_Cls(self.loss_fun, self.inv_trans, self.main_metric_name, self.rot_coef)
 	def main_metric(self):
@@ -69,15 +82,20 @@ class Metrics_Cls:
 			return np.mean(self.trans_errors) + self.rot_coef * np.mean(self.rot_errors)
 		"""
 	def add_batch(self, inp, tgt):
-		self.n_samples += inp.size(0)
 		self.sum_loss += self.loss_fun(inp, tgt)
-		inp, tgt = inp.cpu().detach().numpy(), tgt.cpu().detach().numpy()
+		inp_cls, inp_reg = inp
+		tgt_cls, tgt_reg = tgt
+		self.n_samples += inp_cls.size(0)
+		inp_cls, tgt_cls = inp_cls.cpu().detach().numpy(), tgt_cls.cpu().detach().numpy()
+		inp_reg, tgt_reg = inp_reg.cpu().detach().numpy(), tgt_reg.cpu().detach().numpy()
 		#inp, tgt = inp.reshape(-1, inp.shape[-1]), tgt.reshape(-1, tgt.shape[-1])
 		#print("Before: ", inp.shape, tgt.shape)
-		inp, tgt = self.inv_trans(inp), self.inv_trans(tgt)
+		inp_cls, tgt_cls = self.inv_trans(inp_cls), self.inv_trans(tgt_cls)
 		#print("After: ", inp.shape, tgt.shape)
-		self.inp_lbs.append(inp)
-		self.tgt_lbs.append(tgt)
+		self.inp_lbs.append(inp_cls)
+		self.tgt_lbs.append(tgt_cls)
+		self.inp_regs.append(inp_reg)
+		self.tgt_regs.append(tgt_reg)
 		"""
 		for i in range(len(inp)):
 			self.trans_errors.append(np.linalg.norm(inp[i, : 3] - tgt[i, : 3]))
@@ -93,9 +111,11 @@ class Metrics_Cls:
 		}
 		"""
 		inp = np.concatenate(self.inp_lbs, axis = 0)
-		tgt = np.concatenate(self.tgt_lbs, axis = 0)		
+		tgt = np.concatenate(self.tgt_lbs, axis = 0)
+		inp_r = np.concatenate(self.inp_regs, axis = 0)
+		tgt_r = np.concatenate(self.tgt_regs, axis = 0)
 		return {
-			"loss": self.sum_loss / self.n_samples, "f1_micro": f1_score(tgt, inp, average = "micro"), "f1_macro": f1_score(tgt, inp, average = "macro"), "acc": accuracy_score(tgt, inp)
+			"loss": self.sum_loss / self.n_samples, "f1_macro": f1_score(tgt, inp, average = "macro"), "acc": accuracy_score(tgt, inp), "reg_mae": np.mean(np.abs(inp_r - tgt_r)),
 		}
 	def __repr__(self):
 		dct = self.get_dict()
@@ -104,7 +124,7 @@ class Metrics_Cls:
 		if isinstance(self.loss_fun, BalancedL1Loss):
 			repr_str = repr_str + f" beta: {self.loss_fun._beta.item():.4f}, gamma: {self.loss_fun._gamma.item():.4f}"
 		"""
-		repr_str = "loss: {:.5f}; f1_micro: {:.4f}; f1_macro: {:.4f}; acc: {:.4f}".format(dct["loss"], dct["f1_micro"], dct["f1_macro"], dct["acc"])
+		repr_str = "loss: {:.5f}; f1_macro: {:.4f}; acc: {:.4f}; reg_mae: {:.4f}".format(dct["loss"], dct["f1_macro"], dct["acc"], dct["reg_mae"])
 		return repr_str
 
 

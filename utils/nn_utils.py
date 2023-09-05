@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 
 from utils.cl_utils import load_all_cls_npy
 from utils.file_utils import get_dir_list
-from utils.reg_metrics import Metrics_Reg, Metrics_Cls, BalancedL1Loss, TransL2Loss, TCLoss
+from utils.reg_metrics import Metrics_Reg, Metrics_Cls, BalancedL1Loss, TransL2Loss, TCLoss, CombineLoss
 from utils.preprocess import get_img_transform, get_pose_transforms, get_pose_transforms_classification
 
 from datasets.cl_dataset import CLDataset, TestDataset
@@ -19,7 +19,10 @@ from models.selector import MLPSelector
 
 def get_loss_fun(args):
 	if args.cls:
-		bloss = nn.CrossEntropyLoss()
+		if args.reg_dim > 0:
+			bloss = CombineLoss()
+		else:
+			bloss = nn.CrossEntropyLoss()
 		assert not args.uses_tc
 	elif args.loss_fun == "l1":
 		bloss = nn.L1Loss()
@@ -97,7 +100,7 @@ def get_models(args, *names):
 			if args.uses_posenet:
 				model = PoseNet(base, output_dim = args.output_dim, droprate = args.dropout, n_channels = args.n_channels).to(device)
 			else:
-				model = AtLoc(base, output_dim = args.output_dim, droprate = args.dropout, scale_num_bins = args.scale_num_bins, feat_dim = args.img_encode_dim, n_channels = args.n_channels, batchnorm = args.uses_batchnorm, custombn = args.custom_bn).to(device)
+				model = AtLoc(base, output_dim = args.output_dim, reg_dim = args.reg_dim, droprate = args.dropout, scale_num_bins = args.scale_num_bins, feat_dim = args.img_encode_dim, n_channels = args.n_channels, batchnorm = args.uses_batchnorm, custombn = args.custom_bn).to(device)
 			if t_name.endswith("+"):
 				model.load_state_dict(torch.load(os.path.join(args.save_path, args.atloc_path)))
 		elif t_name.startswith("hisenc"):

@@ -14,16 +14,19 @@ def train_val(model, dataloaders, optimiser, epochs, loss_fun, metric_template, 
 			else:
 				model.eval()
 			this_metric = metric_template.new_copy()
-			for b_id, (imgs, poses) in enumerate(dataloaders[phase]):
+			for b_id, (imgs, poses_cls, poses_reg) in enumerate(dataloaders[phase]):
 				with torch.set_grad_enabled(phase == "train"):
-					imgs, poses_true = imgs.to(device), poses.to(device)
+					imgs, poses_cls, poses_reg = imgs.to(device).float(), poses_cls.to(device).long(), poses_reg.to(device).float()
 					#print(imgs.shape, poses_true.shape)
 					#b, s, c, w, h to b, c, s, w, h
-					imgs = imgs.view(-1, *imgs.shape[-3 : ])
+					#imgs = imgs.view(-1, *imgs.shape[-3 : ])
 					#print(imgs.shape)
 					poses_pred = model(imgs)
+					"""
 					if poses_true.dim() > 1:
 						poses_pred = poses_pred.view(poses_true.shape)
+					"""
+					poses_true = poses_cls, poses_reg
 					loss = loss_fun(poses_pred, poses_true)
 				if phase == "train":
 					optimiser.zero_grad()

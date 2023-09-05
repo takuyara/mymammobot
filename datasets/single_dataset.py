@@ -78,9 +78,12 @@ class PreloadDataset(Dataset):
 		return len(self.imgs)
 
 	def __getitem__(self, idx):
-		img, pose = self.imgs[idx, ...], int(self.labels[idx, ...])		
+		img, pose_cls, pose_reg = self.imgs[idx, ...], int(self.labels[idx, 0]), self.labels[idx, 1 : ]
 		if self.transform_img is not None:
 			img = self.transform_img(img)
+		"""
 		if self.transform_pose is not None:
 			pose = self.transform_pose(pose, True)
-		return img, pose
+		print(img, pose)
+		"""
+		return img, pose_cls, pose_reg
