@@ -10,7 +10,7 @@ from utils.reg_metrics import Metrics_Reg, Metrics_Cls, BalancedL1Loss, TransL2L
 from utils.preprocess import get_img_transform, get_pose_transforms, get_pose_transforms_classification
 
 from datasets.cl_dataset import CLDataset, TestDataset
-from datasets.single_dataset import SingleImageDataset
+from datasets.single_dataset import SingleImageDataset, PreloadDataset
 from datasets.single_tcset import SingleTCDataset
 from models.atloc import AtLoc, PoseNet
 from models.fuser import LSTMFuser
