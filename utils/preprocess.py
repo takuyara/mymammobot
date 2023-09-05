@@ -268,7 +268,7 @@ def get_img_transform(data_stats_path, method, n_channels, train, args):
 	elif method == "hist_complex_blur":
 		def img_to_hist_complex(img, bins = 30):
 			orig_shape = img.shape
-			img = torch.tensor(img).float().unsqueeze()
+			img = torch.tensor(img).float().unsqueeze(0)
 			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img).numpy().reshape(orig_shape)
 			if np.allclose(img.max(), img.min()):
 				img = np.zeros_like(img)
