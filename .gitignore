@@ -168,3 +168,4 @@ rename_files.py
 virtual_dataset
 real_dataset
 slurm*.out
+*.npy

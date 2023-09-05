@@ -48,7 +48,8 @@ def get_base_parser(parser):
 	parser.add_argument("--beta2", type = float, default = 0.999)
 	parser.add_argument("--crop-size", type = int, default = 224)
 	parser.add_argument("--blur-kernel", type = int, default = 21)
-	parser.add_argument("--blur-sigma", type = float, default = 8)
+	parser.add_argument("--blur-sigma", type = float, default = 7)
+	parser.add_argument("--trunc-depth", type = float, default = 90)
 	parser.add_argument("--downsample-size", type = int, default = 224)
 	return parser
 
