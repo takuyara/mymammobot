@@ -23,6 +23,7 @@ def get_args():
 	parser.add_argument("--save-path", type = str, default = "./checkpoints")
 	parser.add_argument("--model-type", type = str, default = "resnet")
 	parser.add_argument("--dropout", type = float, default = 0.4)
+	parser.add_argument("--binary", action = "store_true", default = False)
 	return parser.parse_args()
 
 def get_transform(training, n_channels):
@@ -35,20 +36,27 @@ def get_transform(training, n_channels):
 	return fun
 
 class PreloadDataset(Dataset):
-	def __init__(self, img_path, label_path, transform):
+	def __init__(self, img_path, label_path, transform, binary):
 		self.img_data = np.load(img_path)
 		self.label_data = np.load(label_path)
 		self.transform = transform
+		self.binary = binary
 	def __getitem__(self, idx):
-		return self.transform(self.img_data[idx, ...]), self.label_data[idx, ...]
+		lb = self.label_data[idx, ...]
+		if self.binary:
+			lb = 0 if lb == 0 else 1
+		return self.transform(self.img_data[idx, ...]), lb
 	def __len__(self):
 		return len(self.img_data)
 
 def main():
 	args = get_args()
-	train_set = PreloadDataset(os.path.join(args.base_path, f"{args.train_path}_img.npy"), os.path.join(args.base_path, f"{args.train_path}_label.npy"), get_transform(True, args.n_channels))
+	print(args)
+	if args.binary:
+		args.num_classes = 2
+	train_set = PreloadDataset(os.path.join(args.base_path, f"{args.train_path}_img.npy"), os.path.join(args.base_path, f"{args.train_path}_label.npy"), get_transform(True, args.n_channels), args.binary)
 	print("Train load done.", flush = True)
-	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args.n_channels))
+	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args.n_channels), args.binary)
 	print("Val load done.", flush = True)
 	train_loader = DataLoader(train_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = True)
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)

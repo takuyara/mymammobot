@@ -86,11 +86,18 @@ class AtLoc(nn.Module):
 
         # replace the last FC layer in feature extractor
         self.feature_extractor = feature_extractor
-        if n_channels != 3:
-            self.feature_extractor.conv1 = nn.Conv2d(n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
-        self.feature_extractor.avgpool = nn.AdaptiveAvgPool2d(1)
-        fe_out_planes = self.feature_extractor.fc.in_features
-        self.feature_extractor.fc = nn.Sequential(nn.Linear(fe_out_planes, feat_dim), nn.LeakyReLU(0.2))
+        if hasattr(self.feature_extractor, "fc"):
+            if n_channels != 3:
+                self.feature_extractor.conv1 = nn.Conv2d(n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
+            self.feature_extractor.avgpool = nn.AdaptiveAvgPool2d(1)
+            fe_out_planes = self.feature_extractor.fc.in_features
+            self.feature_extractor.fc = nn.Sequential(nn.Linear(fe_out_planes, feat_dim), nn.Dropout(droprate), nn.LeakyReLU(0.2))
+        else:
+            if n_channels != 3:
+                self.feature_extractor.features[0][0] = nn.Conv2d(n_channels, 96, kernel_size = 4, stride = 4)
+            fe_out_planes = self.feature_extractor.head.in_features
+            self.feature_extractor.head = nn.Sequential(nn.Linear(fe_out_planes, feat_dim), nn.Dropout(droprate), nn.LeakyReLU(0.2))
+
 
         if batchnorm:
             self.batch_norm_2 = nn.BatchNorm1d(feat_dim) if not custombn else CustomBatchNorm(feat_dim, 1)
