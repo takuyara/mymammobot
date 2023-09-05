@@ -27,6 +27,7 @@ def get_args():
 	parser.add_argument("--binary", action = "store_true", default = False)
 	parser.add_argument("--cap", type = float, default = 100)
 	parser.add_argument("--resolution", type = int, default = 224)
+	parser.add_argument("--aug", action = "store_true")
 	return parser.parse_args()
 
 
@@ -55,7 +56,7 @@ class PreloadDataset(Dataset):
 		"""
 
 	def __getitem__(self, idx):
-		lb = self.label_data[idx, ...]
+		lb = self.label_data[idx, 0]
 		img = self.transform(self.img_data[idx, ...])
 		if self.binary:
 			lb = 0 if lb == 0 else 1
