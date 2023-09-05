@@ -7,6 +7,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 from sklearn.metrics import accuracy_score, f1_score
+import matplotlib.pyplot as plt
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -26,11 +27,16 @@ def get_args():
 	parser.add_argument("--binary", action = "store_true", default = False)
 	return parser.parse_args()
 
+
+max_hists = [[], [], []]
+
 def get_transform(training, n_channels):
 	def fun(img):
 		img = torch.tensor(img).unsqueeze(0)
 		if training:
 			img = transforms.GaussianBlur(21, 7)(img)
+			img = torch.minimum(img, torch.tensor(100))
+		img = transforms.Resize(100)(img)
 		img = (img - img.min()) / (img.max() - img.min())
 		return img.repeat(n_channels, 1, 1)
 	return fun
@@ -41,6 +47,11 @@ class PreloadDataset(Dataset):
 		self.label_data = np.load(label_path)
 		self.transform = transform
 		self.binary = binary
+		"""
+		for i in range(len(self.img_data)):
+			max_hists[self.label_data[i, ...]].append(self.img_data[i, ...].max())
+		"""
+
 	def __getitem__(self, idx):
 		lb = self.label_data[idx, ...]
 		img = self.transform(self.img_data[idx, ...])
@@ -58,6 +69,16 @@ def main():
 	if args.binary:
 		args.num_classes = 2
 	train_set = PreloadDataset(os.path.join(args.base_path, f"{args.train_path}_img.npy"), os.path.join(args.base_path, f"{args.train_path}_label.npy"), get_transform(True, args.n_channels), args.binary)
+	"""
+	plt.subplot(1, 3, 1)
+	plt.hist(max_hists[0], bins = 20)
+	plt.subplot(1, 3, 2)
+	plt.hist(max_hists[1], bins = 20)
+	plt.subplot(1, 3, 3)
+	plt.hist(max_hists[2], bins = 20)
+	plt.show()
+	exit()
+	"""
 	print("Train load done.", flush = True)
 	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args.n_channels), args.binary)
 	print("Val load done.", flush = True)
