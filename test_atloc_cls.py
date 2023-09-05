@@ -29,7 +29,7 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 
 	wrong_pts, right_pts = [[], [], []], []
 
-	for (imgs_v, poses_v), (imgs_r, poses_r) in zip(dataloaders["virtual"], dataloaders["real"]):
+	for (imgs_v, poses_v), (imgs_r, poses_r, poses_reg_r) in zip(dataloaders["virtual"], dataloaders["real"]):
 		with torch.no_grad():
 			#assert torch.abs(poses_v - poses_r).max() < 1e-4
 			this_metric_v = metric_template.new_copy()
@@ -37,7 +37,7 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 
 			imgs_r, poses_true_r = imgs_r.to(device), poses_r.to(device)
 
-			poses_pred_r = model(imgs_r)
+			poses_pred_r, poses_pred_reg_r = model(imgs_r)
 			actual_poses = metric_template.inv_trans(poses_v.numpy()).reshape(-1, 6)[ : , : 3]
 			pred_lbs_ = torch.argmax(poses_pred_r, dim = -1)
 			imgs_r = imgs_r.cpu().numpy()
@@ -58,6 +58,7 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 				"""
 				if true_lb == 0 and true_lb != pred_lb:
 					print(poses_pred_r[i, ...])
+					print(poses_pred_reg_r[i, ...])
 
 	
 	#p.add_points(np.stack(all_points_true, axis = 0), render_points_as_spheres = True, point_size = 5, color = "red")
@@ -66,7 +67,8 @@ def train_val(p, model, dataloaders, loss_fun, metric_template, device):
 	#p.add_points(np.stack(both_good, axis = 0), render_points_as_spheres = True, point_size = 10, color = "green")
 	#p.add_points(np.stack(both_bad, axis = 0), render_points_as_spheres = True, point_size = 10, color = "black")
 	for points, colour in zip(wrong_pts, ["red", "blue", "green"]):
-		p.add_points(np.stack(points, axis = 0), render_points_as_spheres = True, point_size = 10, color = colour)
+		if len(points) > 0:
+			p.add_points(np.stack(points, axis = 0), render_points_as_spheres = True, point_size = 10, color = colour)
 	p.add_points(np.stack(right_pts, axis = 0), render_points_as_spheres = True, point_size = 10, color = "black")
 	#p.add_points(np.stack(r_preds, axis = 0), render_points_as_spheres = True, point_size = 10, color = "blue")
 	
@@ -124,7 +126,7 @@ def main():
 	ald = {}
 	args.batch_size = 128
 	args.val_gen = False
-	args.val_preprocess = "hist_accurate_resize"
+	args.val_preprocess = "hist_accurate"
 	args.cls = True
 	args.train_split = "train"
 	args.val_split = "val"

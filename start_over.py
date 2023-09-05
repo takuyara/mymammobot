@@ -26,18 +26,19 @@ def get_args():
 	parser.add_argument("--dropout", type = float, default = 0.4)
 	parser.add_argument("--binary", action = "store_true", default = False)
 	parser.add_argument("--cap", type = float, default = 100)
+	parser.add_argument("--resolution", type = int, default = 224)
 	return parser.parse_args()
 
 
 max_hists = [[], [], []]
 
-def get_transform(training, n_channels, cap):
+def get_transform(training, n_channels, cap, target_size):
 	def fun(img):
 		img = torch.tensor(img).unsqueeze(0)
 		if training:
 			img = transforms.GaussianBlur(21, 7)(img)
 			img = torch.minimum(img, torch.tensor(cap))
-		img = transforms.Resize(224)(img)
+		img = transforms.Resize(target_size)(img)
 		img = (img - img.min()) / (img.max() - img.min())
 		return img.repeat(n_channels, 1, 1)
 	return fun
@@ -69,19 +70,9 @@ def main():
 	print(args)
 	if args.binary:
 		args.num_classes = 2
-	train_set = PreloadDataset(os.path.join(args.base_path, f"{args.train_path}_img.npy"), os.path.join(args.base_path, f"{args.train_path}_label.npy"), get_transform(True, args.n_channels, args.cap), args.binary)
-	"""
-	plt.subplot(1, 3, 1)
-	plt.hist(max_hists[0], bins = 20)
-	plt.subplot(1, 3, 2)
-	plt.hist(max_hists[1], bins = 20)
-	plt.subplot(1, 3, 3)
-	plt.hist(max_hists[2], bins = 20)
-	plt.show()
-	exit()
-	"""
+	train_set = PreloadDataset(os.path.join(args.base_path, f"{args.train_path}_img.npy"), os.path.join(args.base_path, f"{args.train_path}_label.npy"), get_transform(True, args.n_channels, args.cap, args.resolution), args.binary)
 	print("Train load done.", flush = True)
-	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args.n_channels, args.cap), args.binary)
+	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args.n_channels, args.cap, args.resolution), args.binary)
 	print("Val load done.", flush = True)
 	train_loader = DataLoader(train_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = True)
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)

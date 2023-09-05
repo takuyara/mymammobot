@@ -237,7 +237,17 @@ def get_img_transform(data_stats_path, method, n_channels, train, args):
 			img = img.repeat(n_channels, 1, 1)
 			return img
 		return img_to_hist_accurate_blur
-
+	elif method == "hist_accurate_blur_resize_adj":
+		def img_to_hist_accurate_blur(img):
+			img = torch.tensor(img).float().unsqueeze(0)
+			img = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)(img)
+			img = transforms.CenterCrop(args.crop_size)(img)
+			img = transforms.Resize(args.downsample_size)(img)
+			img = torch.minimum(img, torch.tensor(args.trunc_depth))
+			img = (img - img.min()) / (img.max() - img.min())
+			img = img.repeat(n_channels, 1, 1)
+			return img
+		return img_to_hist_accurate_blur
 	elif method == "hist_accurate_blur_jitter":
 		blur = transforms.GaussianBlur(args.blur_kernel, args.blur_sigma)
 		color_jitter = transforms.ColorJitter(brightness = 0.1, contrast = [0.7, 1.1], saturation = 0, hue = 0)
