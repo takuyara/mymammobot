@@ -43,9 +43,12 @@ class PreloadDataset(Dataset):
 		self.binary = binary
 	def __getitem__(self, idx):
 		lb = self.label_data[idx, ...]
+		img = self.transform(self.img_data[idx, ...])
 		if self.binary:
 			lb = 0 if lb == 0 else 1
-		return self.transform(self.img_data[idx, ...]), lb
+			if lb == 0:
+				img = transforms.functional.adjust_gamma(img, 0.6)
+		return img, lb
 	def __len__(self):
 		return len(self.img_data)
 

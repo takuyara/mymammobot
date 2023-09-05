@@ -46,7 +46,10 @@ class SingleImageDataset(Dataset):
 	def __getitem__(self, idx):
 		p, i = self.samples[idx]
 		if self.plotter is None:
-			img = np.load(os.path.join(p, f"{i:06d}.npy"))
+			try:
+				img = np.load(os.path.join(p, f"{i:06d}.npy"))
+			except ValueError:
+				print("Fuck: ", os.path.join(p, f"{i:06d}.npy"))
 		else:
 			img = None
 		pose = np.loadtxt(os.path.join(p, f"{i:06d}.txt"))
