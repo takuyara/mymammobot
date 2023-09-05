@@ -59,9 +59,10 @@ def main():
 	val_set = get_dataset([os.path.join(args.base_path, ts) for ts in args.val_split], get_transform(False, args.n_channels))
 	train_loader = DataLoader(train_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = True)
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
-	model = models.resnet50(weights = models.ResNet50_Weights.DEFAULT, num_classes = args.num_classes)
+	model = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
 	if args.n_channels != 3:
-		model.conv1 = nn.Conv2d(n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
+		model.conv1 = nn.Conv2d(args.n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
+	model.fc = nn.Linear(model.fc.in_features, args.num_classes)
 	model = model.to(args.device)
 	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr)
 	for epoch in range(args.epochs):
