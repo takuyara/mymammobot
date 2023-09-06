@@ -29,6 +29,7 @@ def get_args():
 	parser.add_argument("--resolution", type = int, default = 224)
 	parser.add_argument("--aug", action = "store_true")
 	parser.add_argument("--ckpt-path", type = str, default = "")
+	parser.add_argument("--four-fold", action = "store_true", default = False)
 	return parser.parse_args()
 
 
@@ -46,7 +47,7 @@ def get_transform(training, n_channels, cap, target_size):
 	return fun
 
 class PreloadDataset(Dataset):
-	def __init__(self, img_path, label_path, transform, binary):
+	def __init__(self, img_path, label_path, transform, binary, four_fold):
 		self.img_data = np.load(img_path)
 		self.label_data = np.load(label_path)
 		self.transform = transform
@@ -72,6 +73,8 @@ def main():
 	print(args)
 	if args.binary:
 		args.num_classes = 2
+	if args.four_fold:
+		args.num_classes = 4
 	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args.n_channels, args.cap, args.resolution), args.binary)
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	if args.model_type == "resnet":
