@@ -43,9 +43,10 @@ def get_transform(training, n_channels, cap, target_size, aug):
 			img = transforms.GaussianBlur(21, 7)(img)
 			img = torch.minimum(img, torch.tensor(cap))
 			if aug:
-				img = transforms.ElasticTransform(alpha = 50., sigma = 5.)(img)
-				img = transforms.RandomPerspective(distortion_scale = 0.1, p = 0.5)(img)
-				img = transforms.RandomCrop(randu_gen(200, 224)())(img)
+				# Original params: 50, 5, 0.1, 0.5, 220
+				img = transforms.ElasticTransform(alpha = 70., sigma = 6.)(img)
+				img = transforms.RandomPerspective(distortion_scale = 0.25, p = 0.75)(img)
+				img = transforms.RandomCrop(randu_gen(180, 224)())(img)
 		img = transforms.Resize(target_size)(img)
 		img = (img - img.min()) / (img.max() - img.min())
 		return img.repeat(n_channels, 1, 1)

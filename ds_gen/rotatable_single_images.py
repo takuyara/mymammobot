@@ -42,8 +42,15 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 
 	#total_volume = 18000
 
+	out_imgs, out_labels = [], []
+
 	img_idx = 0
 	for cl_idx, (points, radiuses) in enumerate(all_cls):
+		total_axial_len = 0
+		for on_line_idx in range(len(points) - 1):
+			cl_point_base = points[on_line_idx]
+			cl_orientation, axial_len, lumen_radius = get_direction_dist_radius(all_cls, (cl_idx, on_line_idx))
+			total_axial_len += axial_len
 		sum_axial_len = 0
 		for on_line_idx in tqdm(range(len(points) - 1)):
 			cl_point_base = points[on_line_idx]
@@ -62,10 +69,12 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 			#num_samples_on_this_cl = int(round(axial_len / total_cl_len * num_samples))
 			num_samples_on_this_cl = int(num_samples / len(all_cls) / (len(points) - 1))
 
+			"""
 			if cl_idx == 0:
 				num_samples_on_this_cl = int(1.5 * num_samples_on_this_cl)
 			elif sum_axial_len > 100:
 				num_samples_on_this_cl = 0
+			"""
 
 			#print(cl_orientation)
 
@@ -119,9 +128,13 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 					continue
 
 				out_pose = np.stack([t_position, t_orientation, t_up], axis = 0)
-				np.savetxt(os.path.join(output_path, f"{img_idx:06d}.txt"), out_pose, fmt = "%.6f")
+				cl_pose = np.array([[cl_idx, (sum_axial_len + axial_norm) / total_axial_len, radial_norm / lumen_radius, radial_rot]])
 
-				cl_pose = np.array([[cl_idx, sum_axial_len + axial_norm, radial_norm, radial_rot]])
+				out_imgs.append(dep.astype(np.float32))
+				out_labels.append(cl_pose.astype(np.float32))
+
+				"""
+				np.savetxt(os.path.join(output_path, f"{img_idx:06d}.txt"), out_pose, fmt = "%.6f")
 				np.savetxt(os.path.join(output_path, f"{img_idx:06d}_clbase.txt"), cl_pose, fmt = "%.6f")
 				#cv2.imwrite(os.path.join(reference_path, f"{img_idx:06d}.png"), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
 				if not out_pose_only:
@@ -134,7 +147,9 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 						Image.fromarray(rgb).save(os.path.join(reference_path, f"{img_idx:06d}.png"))
 						#cv2.imwrite(, dep)
 						#cv2.imwrite(, cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
-				
+				"""
 				img_idx += 1
 
 			sum_axial_len += axial_len
+	np.save("./train_imgs_new.npy", np.stack(out_imgs, axis = 0))
+	np.save("./train_labels_new.npy", np.concatenate(out_labels, axis = 0))

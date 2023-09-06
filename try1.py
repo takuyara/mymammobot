@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-imgs = np.load("train_img.npy")
-labels = np.load("train_label.npy")
+imgs = np.load("train_imgs_new.npy")
+labels = np.load("train_labels_new.npy")
 while True:
 	idx = int(input("INPUT"))
 	plt.imshow(imgs[idx, ...])

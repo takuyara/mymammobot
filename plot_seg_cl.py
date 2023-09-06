@@ -100,17 +100,19 @@ def main():
 		print(out.shape)
 		np.save(os.path.join(out_path, f"CL{i}.npy"), out)
 
-	"""
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
 		for row in reader:
-			if int(row["em_idx"]) == em_idx:
+			#if int(row["em_idx"]) == em_idx:
+			if int(row["human_eval"]) == 1:
 				points.append(str_to_arr(row["position"]))
 				orients.append(str_to_arr(row["orientation"]))
 				ups.append(str_to_arr(row["up"]))
 	points = np.stack(points, axis = 0)
 	orients = np.stack(orients, axis = 0)
 	ups = np.stack(ups, axis = 0)
+
+	"""
 
 	gen_points = []
 	gen_orients = []
@@ -150,7 +152,7 @@ def main():
 		p.add_mesh(cl_to_poly(path), color = "blue")
 	"""
 
-	#p.add_points(points, render_points_as_spheres = True, point_size = 5, color = "red")
+	p.add_points(points, render_points_as_spheres = True, point_size = 2, color = "black")
 
 	#p.add_points(gen_points_t, render_points_as_spheres = True, point_size = 5, color = "yellow")
 	#p.add_points(gen_points, render_points_as_spheres = True, point_size = 5, color = "green")
