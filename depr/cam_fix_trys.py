@@ -76,6 +76,7 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 	real_rgb = cv2.imread(os.path.join(args.em_base_path, f"EM-RGB-{args.em_idx}", f"{frame_idx}.png"))
 	#print(os.path.join(em_depth_path, f"{frame_idx:06d}.npy"), os.path.join(em_path, f"{frame_idx:06d}.png"))
 
+	print("In check rotation")
 	num_samples = 500
 	up_samples = 180
 
@@ -249,7 +250,7 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 	def get_threshold(x, bins = 20, rate = 0.1):
 		#return np.median(x.flatten()) * 2 - x.min()
 		h, bin_edges = np.histogram(x.flatten(), bins = bins, density = True)
-		first_outlier_idx = len(h) - np.argmax(np.flip((h > np.max(h) * rate).astype(np.int)))
+		first_outlier_idx = len(h) - np.argmax(np.flip((h > np.max(h) * rate).astype(int)))
 		return bin_edges[first_outlier_idx]
 
 	def get_old_weights(rd1, vd1):
@@ -334,7 +335,10 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 		iou[np.logical_and(rd1 > r_thres, vd1 > v_thres)] = 1
 		iou[np.logical_and(rd1 > r_thres, vd1 <= v_thres)] = 2
 		iou[np.logical_and(rd1 <= r_thres, vd1 > v_thres)] = 3
-		return iou.reshape(*prev_shape)
+
+		iou_value = np.sum(np.logical_and(rd1 > r_thres, vd1 > v_thres)) / np.sum(np.logical_or(rd1 > r_thres, vd1 > v_thres))
+		#return iou.reshape(*prev_shape)
+		return iou_value, hausdorff_dist
 
 		#print(f"Confirmed corr {(np.sum(err * w) / np.sum(w)):.4f}")
 
@@ -350,16 +354,18 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 	err_new, mask_new, corr_new = plot_it(new_rgb, new_dep)
 	#err_new, mask_new, corr_new = plot_it(new_rgb, new_dep, mean_method = "simple")
 
+	"""
 	plt.imshow(new_dep, cmap = "gray")
 	plt.show()
 	exit()
+	"""
 
 
 
 	print("Old sim (corr, log): ", comb_corr_sim(real_depth_map, old_dep), log_error(real_depth_map, old_dep))
-	old_iou = analysis_corr(real_depth_map, old_dep)
+	old_iou, old_hd = analysis_corr(real_depth_map, old_dep)
 	print("New sim (corr, log): ", comb_corr_sim(real_depth_map, new_dep), log_error(real_depth_map, new_dep))
-	new_iou = analysis_corr(real_depth_map, new_dep)
+	new_iou, new_hd = analysis_corr(real_depth_map, new_dep)
 
 	"""
 	for fl in [20, 50, 100, 200, 300]:
@@ -386,6 +392,34 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 	plt.show()
 	exit()
 	"""
+
+	plt.subplot(2, 2, 1)
+	plt.imshow(real_depth_map, cmap = "gray")
+	plt.title("Real SFS Depth")
+	plt.subplot(2, 2, 2)
+	plt.imshow(real_rgb)
+	plt.title("Real RGB")
+	#plt.imshow(err_old, vmin = -0.5, vmax = 5)
+	#plt.hist(err1.flatten())
+	plt.subplot(2, 2, 3)
+	plt.imshow(old_dep, cmap = "gray")
+	plt.title(f"Correlation: {comb_corr_sim(real_depth_map, old_dep):.4f}. IoU: {old_iou:.4f}. HD: {old_hd:.2f}")
+	plt.subplot(2, 2, 4)
+	plt.imshow(new_dep, cmap = "gray")
+	plt.title(f"Correlation: {comb_corr_sim(real_depth_map, new_dep):.4f}. IoU: {new_iou:.4f}. HD: {new_hd:.2f}")
+	#plt.imshow(old_dep, cmap = "gray", vmin = 0, vmax = 40)
+	plt.show()
+	exit()
+	plt.subplot(2, 3, 5)
+	#plt.imshow(new_dep, cmap = "gray", vmin = 0, vmax = 40)
+
+	plt.colorbar()
+	plt.title(f"New weighted mean: {weighted_mean(new_dep, mask_new):.4f}.")
+	plt.subplot(2, 3, 6)
+	#plt.imshow(mask_new)
+	plt.imshow(new_iou)
+	plt.colorbar()
+	plt.show()
 
 	plt.subplot(2, 3, 1)
 	#plt.imshow(err_old, vmin = -0.5, vmax = 5)
@@ -460,12 +494,13 @@ def check_rotation_1(frame_idx, em_path, em_depth_path, output_path, args):
 
 def main():
 	args = get_args()
-	"""
+	
 	args.em_idx = 1
 	frame_idx = 1416
 	"""
 	args.em_idx = 0
 	frame_idx = 680
+	"""
 	args.try_idx = "non-specific-tryidx"
 	output_path = os.path.join(args.em_base_path, f"EM-virtual-autofix-{args.em_idx}-{frame_idx}-{args.try_idx}")
 	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
@@ -488,7 +523,9 @@ def main():
 		check_rotation(frame_idx, em_path, em_depth_path, output_path, args)
 	"""
 
-	check_rotation_1(frame_idx, em_path, em_depth_path, output_path, args)
+	print("Before check rotation")
+	check_rotation(frame_idx, em_path, em_depth_path, output_path, args)
+
 
 if __name__ == '__main__':
 	main()
