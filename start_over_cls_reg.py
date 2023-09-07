@@ -10,6 +10,7 @@ from torchvision import models, transforms
 from sklearn.metrics import accuracy_score, f1_score
 import matplotlib.pyplot as plt
 from utils.misc import randu_gen
+from models.model_utils import get_mlp
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -42,6 +43,8 @@ def get_args():
 	parser.add_argument("--mlp-in-features", type = int, default = 2048)
 	parser.add_argument("--inject-dropout", action = "store_true", default = False)
 	parser.add_argument("--normalise", action = "store_true", default = False)
+	parser.add_argument("--cls-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
+	parser.add_argument("--reg-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
 	return parser.parse_args()
 
 
@@ -119,17 +122,21 @@ class ClsRegModel(nn.Module):
 		print(base.fc.in_features)
 		base.fc = nn.Sequential(nn.Linear(base.fc.in_features, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
 		self.base = base
-		self.out_cls = nn.Linear(args.mlp_in_features, args.num_classes)
+		self.mlp_cls, cls_final_dim = get_mlp(args.mlp_in_features, args.cls_neurons, args.dropout)
+		self.mlp_reg, reg_final_dim = get_mlp(args.mlp_in_features, args.reg_neurons, args.dropout)
+		self.out_cls = nn.Linear(cls_final_dim, args.num_classes)
 		if args.uses_sigmoid:
-			self.out_reg = nn.Sequential(nn.Linear(args.mlp_in_features, args.reg_dims), nn.Sigmoid())
+			self.out_reg = nn.Sequential(nn.Linear(reg_final_dim, args.reg_dims), nn.Sigmoid())
 		else:
-			self.out_reg = nn.Linear(args.mlp_in_features, args.reg_dims)
+			self.out_reg = nn.Linear(reg_final_dim, args.reg_dims)
 	def forward(self, x):
 		if self.batch_norm is not None:
 			x = self.batch_norm(x)
 		x = self.base(x)
-		out_cls = self.out_cls(x)
-		out_reg = self.out_reg(x)
+		x_cls = self.mlp_cls(x)
+		x_reg = self.mlp_reg(x)
+		out_cls = self.out_cls(x_cls)
+		out_reg = self.out_reg(x_reg)
 		return out_cls, out_reg
 
 def append_dropout(model, dropout):
