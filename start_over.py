@@ -94,9 +94,9 @@ class PreloadDataset(Dataset):
 
 def get_model(args):
 	if args.model_type.find("resnet") != -1:
-		if model_type == "resnet34":
+		if args.model_type == "resnet34":
 			model = models.resnet34(weights = models.ResNet34_Weights.DEFAULT)
-		elif model_type == "resnet18":
+		elif args.model_type == "resnet18":
 			model = models.resnet18(weights = models.ResNet18_Weights.DEFAULT)
 		else:
 			model = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
