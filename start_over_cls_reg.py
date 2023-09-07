@@ -11,6 +11,9 @@ from sklearn.metrics import accuracy_score, f1_score
 import matplotlib.pyplot as plt
 from utils.misc import randu_gen
 
+import warnings
+warnings.filterwarnings("ignore")
+
 def get_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--base-path", type = str, default = "./")
