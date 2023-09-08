@@ -121,7 +121,12 @@ class ClsRegModel(nn.Module):
 			self.batch_norm = nn.BatchNorm2d(args.n_channels)
 		else:
 			self.batch_norm = None
-		base.fc = nn.Sequential(nn.Linear(base.fc.in_features, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
+		if hasattr(base, "fc"):
+			base.fc = nn.Sequential(nn.Linear(base.fc.in_features, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
+		elif hasattr(base, "head"):
+			base.head = nn.Sequential(nn.Linear(base.head.in_features, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
+		else:
+			raise NotImplementedError
 		self.base = base
 		if args.cls_neurons != [0]:
 			self.mlp_cls, cls_final_dim = get_mlp(args.mlp_in_features, args.cls_neurons, args.dropout)
