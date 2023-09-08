@@ -45,6 +45,8 @@ def get_args():
 	parser.add_argument("--normalise", action = "store_true", default = False)
 	parser.add_argument("--cls-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
 	parser.add_argument("--reg-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
+	parser.add_argument("--amsgrad", action = "store_true", default = False)
+	parser.add_argument("--step-lr-size", type = int, default = 10)
 	return parser.parse_args()
 
 
@@ -191,7 +193,8 @@ def main():
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	model = get_model(args)
 	model = model.to(args.device)
-	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr)
+	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr, amsgrad = args.amsgrad)
+	scheduler = torch.optim.lr_scheduler.StepLR(optimiser, args.step_size)
 	max_acc = 0
 	torch.autograd.set_detect_anomaly(True)
 	for epoch in range(args.epochs):
@@ -229,6 +232,7 @@ def main():
 				if max_acc > 0.65:
 					torch.save(best_weights, os.path.join(args.save_path, f"ckpt-{max_acc:.4f}.pt"))
 		print("Epoch time: {:.2f} mins".format((time.time() - st_time) / 60))
+		scheduler.step()
 	print("Max: ", max_acc, max_f1, max_l1)
 
 if __name__ == '__main__':
