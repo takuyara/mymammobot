@@ -194,7 +194,7 @@ def main():
 	model = get_model(args)
 	model = model.to(args.device)
 	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr, amsgrad = args.amsgrad)
-	scheduler = torch.optim.lr_scheduler.StepLR(optimiser, args.step_size)
+	scheduler = torch.optim.lr_scheduler.StepLR(optimiser, args.step_lr_size)
 	max_acc = 0
 	torch.autograd.set_detect_anomaly(True)
 	for epoch in range(args.epochs):
