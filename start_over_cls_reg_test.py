@@ -46,7 +46,6 @@ def get_args():
 	parser.add_argument("--cls-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
 	parser.add_argument("--reg-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
 	parser.add_argument("--ckpt-path", type = str, default = "")
-	parser.add_argument("--max-rot-angle", type = float, default = 0)
 	return parser.parse_args()
 
 
@@ -61,15 +60,12 @@ def get_transform(training, args):
 	crop_train = transforms.RandomResizedCrop(args.target_size, scale = (0.9, 1.0), ratio = (0.95, 1.05))
 	resize = transforms.Resize(args.target_size)
 	normalise = transforms.Normalize((0.1109, ), (0.1230, ))
-	rotate_crop = transforms.Compose([transforms.RandomRotation(args.max_rot_angle), transforms.CentreCrop(235)])
 	def fun(img):
 		img = torch.tensor(img).unsqueeze(0)
 		if training:
 			img = blur(img)
 			img = torch.minimum(img, torch.tensor(args.cap))
 			if args.aug:
-				if args.max_rot_angle > 0:
-					img = rotate_crop(img)
 				img = elastic(img)
 				img = persp(img)
 				img = crop_train(img)
