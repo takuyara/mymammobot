@@ -39,6 +39,7 @@ def get_args():
 	parser.add_argument("--uses-bn", action = "store_true", default = False)
 	parser.add_argument("--uses-sigmoid", action = "store_true", default = False)
 	parser.add_argument("--reg-loss-rate", type = float, default = 0.5)
+	parser.add_argument("--cls-loss-rate", type = float, default = 1.0)
 	parser.add_argument("--reg-dims", type = int, default = 1)
 	parser.add_argument("--mlp-in-features", type = int, default = 2048)
 	parser.add_argument("--inject-dropout", action = "store_true", default = False)
@@ -220,7 +221,7 @@ def main():
 				imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
 				with torch.set_grad_enabled(phase == "train"):
 					logits, pred_coords = model(imgs)
-					loss = nn.CrossEntropyLoss()(logits, labels) + args.reg_loss_rate * nn.MSELoss()(coords, pred_coords)
+					loss = args.cls_loss_rate * nn.CrossEntropyLoss()(logits, labels) + args.reg_loss_rate * nn.MSELoss()(coords, pred_coords)
 				if phase == "train":
 					optimiser.zero_grad()
 					loss.backward()
