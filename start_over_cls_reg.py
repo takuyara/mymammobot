@@ -62,7 +62,7 @@ def get_transform(training, args):
 	crop_train = transforms.RandomResizedCrop(args.target_size, scale = (0.9, 1.0), ratio = (0.95, 1.05))
 	resize = transforms.Resize(args.target_size)
 	normalise = transforms.Normalize((0.1109, ), (0.1230, ))
-	rotate_crop = transforms.Compose([transforms.RandomRotation(args.max_rot_angle), transforms.CentreCrop(235)])
+	rotate_crop = transforms.Compose([transforms.RandomRotation(args.max_rot_angle), transforms.CenterCrop(235)])
 	def fun(img):
 		img = torch.tensor(img).unsqueeze(0)
 		if training:
