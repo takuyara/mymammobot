@@ -53,7 +53,7 @@ def static_focal_radial_offset_gen(radius):
 		return np.random.choice(distrib)
 	return fun
 	"""
-	return randu_gen(0, radius * 0.1)
+	return randu_gen(0, radius * 0.5)
 
 def dynamic_total_velocity_gen(radius):
 	return randu_gen(0, 10)

@@ -21,10 +21,10 @@ def rotate_and_crop(img, deg, img_size):
 	st = (img.shape[0] - img_size) // 2
 	return img[st : st + img_size, st : st + img_size]
 
-def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_path, num_samples, img_size, out_pose_only = False, norm_img = False, zoom_scale = 2 ** -0.5, axial_extend_rate = 0.05, radial_safe_rate = 0.96):
+def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_path, num_samples, img_size, out_pose_only = False, norm_img = False, zoom_scale = 2 ** -0.5, suffix = "", axial_extend_rate = 0.05, radial_safe_rate = 0.96, min_depth_thres = 3, max_num_iters = 2.5):
 	all_cls = load_all_cls_npy(seg_cl_path)
 
-	plotter = pv.Plotter(off_screen = True, window_size = (img_size, img_size))
+	plotter, zoomed_size = get_zoomed_plotter(img_size, zoom_scale)
 	plotter.add_mesh(pv.read(mesh_path))
 
 	"""
@@ -42,7 +42,8 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 
 	#total_volume = 18000
 
-	out_imgs, out_labels = [], []
+	out_labels = []
+	out_imgs_cache = np.zeros((num_samples, zoomed_size, zoomed_size), np.float32)
 
 	img_idx = 0
 	for cl_idx, (points, radiuses) in enumerate(all_cls):
@@ -78,7 +79,10 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 
 			#print(cl_orientation)
 
-			for i in range(num_samples_on_this_cl):
+			num_iters = num_gen_samples = 0
+
+			while num_iters < int(max_num_iters * num_samples_on_this_cl) and num_gen_samples < num_samples_on_this_cl:
+				num_iters += 1
 				axial_norm = axial_norm_gen()
 				radial_norm = radial_norm_gen()
 				radial_rot = angle_gen()
@@ -105,7 +109,8 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 
 				t_up = rotate_single_vector(arbitrary_perpendicular_vector(t_orientation), t_orientation, angle_gen())
 
-				rgb, dep = get_depth_map(plotter, t_position, t_orientation, t_up, get_outputs = True)
+				rgb, dep = get_depth_map(plotter, t_position, t_orientation, t_up, zoom = zoom_scale, get_outputs = True)
+
 				"""
 				p.camera.position = t_position
 				p.camera.focal_point = t_position + camera_params["focal_length"] * t_orientation
@@ -124,13 +129,15 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 				#plt.show()
 
 
-				if abs(np.max(np.min(rgb, axis = -1)) - 255) < 1e-2:
+				if abs(np.max(np.min(rgb, axis = -1)) - 255) < 1e-2 or np.max(dep) < min_depth_thres:
 					continue
 
+				num_gen_samples += 1
 				out_pose = np.stack([t_position, t_orientation, t_up], axis = 0)
-				cl_pose = np.array([[cl_idx, (sum_axial_len + axial_norm) / total_axial_len, radial_norm / lumen_radius, radial_rot]])
+				cl_pose = np.array([cl_idx, (sum_axial_len + axial_norm) / total_axial_len, radial_norm / lumen_radius, radial_rot, total_axial_len])
+				all_pose = np.concatenate([cl_pose, out_pose.ravel()], axis = 0)
 
-				out_imgs.append(dep.astype(np.float32))
+				out_imgs_cache[img_idx] = dep
 				out_labels.append(cl_pose.astype(np.float32))
 
 				"""
@@ -151,5 +158,7 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 				img_idx += 1
 
 			sum_axial_len += axial_len
-	np.save("./train_imgs_new.npy", np.stack(out_imgs, axis = 0))
-	np.save("./train_labels_new.npy", np.concatenate(out_labels, axis = 0))
+	out_labels = np.stack(out_labels, axis = 0)
+	np.save(f"./train_{suffix}_img.npy", out_imgs_cache[ : len(out_labels), ...])
+	np.save(f"./train_{suffix}_label.npy", out_labels)
+	print(out_imgs_cache.shape, out_labels.shape)

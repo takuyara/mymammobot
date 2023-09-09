@@ -40,10 +40,12 @@ def is_camera_in_bounds(
 	img = p.screenshot(None, return_img = True)
 	return not np.isclose(np.max(np.min(img, axis = -1)), 255)
 
-def get_zoomed_plotter(img_size, zoom_scale, orig_view_angle = camera_params["view_angle"]):
+def get_zoomed_plotter(img_size, zoom_scale, orig_view_angle = None):
+	if orig_view_angle is None:
+		orig_view_angle = camera_params["view_angle"]
 	half_angle = np.deg2rad(orig_view_angle / 2)
 	size_change_rate = np.tan(half_angle / zoom_scale) / np.tan(half_angle)
 	zoomed_size = int(img_size * size_change_rate)
 	p1 = pv.Plotter(off_screen = True, window_size = (zoomed_size, zoomed_size))
-	return p1
+	return p1, zoomed_size
 

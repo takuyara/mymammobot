@@ -3,6 +3,9 @@ import numpy as np
 import argparse
 import json
 import matplotlib.pyplot as plt
+from utils.geometry import get_vector_angle
+from utils.cl_utils import load_all_cls, get_direction_dist_radius
+from utils.misc import str_to_arr
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -14,7 +17,9 @@ def get_args():
 
 def main():
 	args = get_args()
-	radiuses, r_norms, fr_norms = [], [], []
+	all_cls = load_all_cls("./CL")
+	radiuses, r_norms, fr_norms, angles = [], [], [], []
+	rates = []
 	with open(args.data_path, newline = "") as f:
 		reader = csv.DictReader(f)
 		for row in reader:
@@ -22,6 +27,10 @@ def main():
 				radiuses.append(float(row["lumen_radius"]))
 				r_norms.append(float(row["radial_norm"]))
 				fr_norms.append(float(row["focal_radial_norm"]))
+				cl_direction = get_direction_dist_radius(all_cls, (int(row["cl_idx"]), int(row["on_line_idx"])))[0]
+				orientation = str_to_arr(row["orientation"])
+				angle = get_vector_angle(orientation, cl_direction)
+				angles.append(angle)
 	r_mn, r_mx = np.min(radiuses), np.max(radiuses)
 	bin_width = (r_mx - r_mn) / args.num_bins
 	#plt.hist(radiuses, bins = args.num_bins)
@@ -31,7 +40,7 @@ def main():
 		idx = int(min((t_radius - r_mn) // bin_width, args.num_bins - 1))
 		rnorm_distrib[idx].append(t_rnorm)
 		frnorm_distrib[idx].append(t_frnorm)
-	res = {"num_bins": args.num_bins, "bin_width": bin_width, "min_radius": r_mn, "rnorm_distrib": rnorm_distrib, "frnorm_distrib": frnorm_distrib}
+	res = {"num_bins ": args.num_bins, "bin_width": bin_width, "min_radius": r_mn, "rnorm_distrib": rnorm_distrib, "frnorm_distrib": frnorm_distrib}
 	json.dump(res, open(args.out_path, "w"))
 
 if __name__ == '__main__':
