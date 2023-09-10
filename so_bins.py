@@ -130,13 +130,9 @@ class Rescaler(nn.Module):
 		self.mlp = get_mlp(bins, [32, 64, 128, 1], dropout)[0]
 		self.bins = bins
 	def forward(self, x):
-		print(x.shape)
 		hst = torch.stack([torch.histc(tx.flatten(), bins = self.bins, min = 0., max = 1.) for tx in torch.unbind(x)], dim = 0)
-		print(hst.shape)
 		w = self.mlp(hst).unsqueeze(-1).unsqueeze(-1)
-		print(w.shape)
 		out = x * w
-		print(hst.shape, w.shape, out.shape)
 		return out
 
 class ClsRegModel(nn.Module):
