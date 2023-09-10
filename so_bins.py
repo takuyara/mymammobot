@@ -61,7 +61,7 @@ def get_transform(training, args):
 	# Original params: 50, 5, 0.1, 0.5, 220
 	# Not working params: 70, 6, 0.25, 0.75, 180
 	elastic = transforms.ElasticTransform(alpha = 50., sigma = 5.)
-	persp = transforms.RandomPerspective(distortion_scale = 0.1, p = 0.5)
+	persp = transforms.RandomPerspective(distortion_scale = 0.15, p = 0.5)
 	crop_train = transforms.RandomResizedCrop(args.target_size, scale = (0.9, 1.0), ratio = (0.95, 1.05))
 	resize = transforms.Resize(args.target_size)
 	normalise = transforms.Normalize((0.1109, ), (0.1230, ))
@@ -73,9 +73,11 @@ def get_transform(training, args):
 			img = blur(img)
 			img = torch.minimum(img, torch.tensor(args.cap))
 			if args.aug:
+				"""
 				if args.max_rot_angle > 0:
 					img = rotate(img)
 				img = crop_(img)
+				"""
 				img = elastic(img)
 				img = persp(img)
 				img = crop_train(img)

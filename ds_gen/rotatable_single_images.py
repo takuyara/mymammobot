@@ -130,7 +130,12 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 				#plt.show()
 
 
-				if abs(np.max(np.min(rgb, axis = -1)) - 255) < 1e-2 or np.max(dep) < min_depth_thres:
+				if abs(np.max(np.min(rgb, axis = -1)) - 255) < 1e-2:
+					continue
+
+				if np.max(dep) < min_depth_thres:
+					plt.imshow(rgb)
+					plt.show()
 					continue
 
 				num_gen_samples += 1

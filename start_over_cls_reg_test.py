@@ -212,6 +212,7 @@ def main():
 	scatters = [[[], [], []] for i in range(args.num_classes)]
 	lb_to_colour = ["red", "green", "blue"]
 	correct_l1s, wrong_l1s = [], []
+	correct_yts, correct_yps, wrong_yts, wrong_yps = [], [], [], []
 
 	for true_label, pred_label, t_c, p_c in zip(y_true, y_pred, coord_trues, coord_preds):
 		scatters[true_label][0].append(t_c)
@@ -220,14 +221,26 @@ def main():
 		this_l1 = np.mean(np.abs(t_c - p_c))
 		if true_label == pred_label:
 			correct_l1s.append(this_l1)
+			correct_yts.append(t_c)
+			correct_yps.append(p_c)
 		else:
 			wrong_l1s.append(this_l1)
+			wrong_yts.append(t_c)
+			wrong_yps.append(p_c)
+
+	print(np.std(coord_trues), np.std(coord_preds))
+	print(np.any(np.isnan(coord_trues)), np.any(np.isnan(coord_preds)))
+	print(coord_trues.shape, coord_preds.shape)
+
+	print(np.corrcoef(coord_trues.ravel(), coord_preds.ravel())[1][0], np.corrcoef(np.array(correct_yts).ravel(), np.array(correct_yps).ravel())[1][0], np.corrcoef(np.array(wrong_yts).ravel(), np.array(wrong_yps).ravel())[1][0])
 
 	print("Correct L1s: {:.4f}, Wrong L1s: {:.4f}".format(np.mean(correct_l1s), np.mean(wrong_l1s)))
 
+	"""
 	for i in range(args.num_classes):
 		plt.scatter(scatters[i][0], scatters[i][1], color = scatters[i][2])
 		plt.title(f"Class: {i}")
 		plt.show()
+	"""
 if __name__ == '__main__':
 	main()
