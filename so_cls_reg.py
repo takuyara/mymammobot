@@ -7,7 +7,7 @@ from copy import deepcopy
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
+from sklearn.metrics import accuracy_score, f1_score
 import matplotlib.pyplot as plt
 from utils.misc import randu_gen
 from models.model_utils import get_mlp
@@ -45,7 +45,8 @@ def get_args():
 	parser.add_argument("--normalise", action = "store_true", default = False)
 	parser.add_argument("--cls-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
 	parser.add_argument("--reg-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
-	parser.add_argument("--ckpt-path", type = str, default = "")
+	parser.add_argument("--amsgrad", action = "store_true", default = False)
+	parser.add_argument("--step-lr-size", type = int, default = 10)
 	return parser.parse_args()
 
 
@@ -56,7 +57,7 @@ def get_transform(training, args):
 	# Original params: 50, 5, 0.1, 0.5, 220
 	# Not working params: 70, 6, 0.25, 0.75, 180
 	elastic = transforms.ElasticTransform(alpha = 50., sigma = 5.)
-	persp = transforms.RandomPerspective(distortion_scale = 0.1, p = 0.5)
+	persp = transforms.RandomPerspective(distortion_scale = 0.15, p = 0.5)
 	crop_train = transforms.RandomResizedCrop(args.target_size, scale = (0.9, 1.0), ratio = (0.95, 1.05))
 	resize = transforms.Resize(args.target_size)
 	normalise = transforms.Normalize((0.1109, ), (0.1230, ))
@@ -120,7 +121,6 @@ class ClsRegModel(nn.Module):
 			self.batch_norm = nn.BatchNorm2d(args.n_channels)
 		else:
 			self.batch_norm = None
-		print(base.fc.in_features)
 		base.fc = nn.Sequential(nn.Linear(base.fc.in_features, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
 		self.base = base
 		if args.cls_neurons != [0]:
@@ -185,86 +185,56 @@ def main():
 	print(args)
 	if args.four_fold:
 		args.num_classes = 4
+	train_set = PreloadDataset(os.path.join(args.base_path, f"{args.train_path}_img.npy"), os.path.join(args.base_path, f"{args.train_path}_label.npy"), get_transform(True, args), args)
+	print("Train load done.", flush = True)
 	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args), args)
 	print("Val load done.", flush = True)
+	train_loader = DataLoader(train_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = True)
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	model = get_model(args)
 	model = model.to(args.device)
-	model.load_state_dict(torch.load(os.path.join(args.save_path, args.ckpt_path)))
-	model.eval()
+	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr, amsgrad = args.amsgrad)
+	scheduler = torch.optim.lr_scheduler.StepLR(optimiser, args.step_size)
+	scheduler = torch.optim.lr_scheduler.StepLR(optimiser, args.step_lr_size)
+	max_acc = 0
+	torch.autograd.set_detect_anomaly(True)
+	for epoch in range(args.epochs):
+		st_time = time.time()
+		for phase, loader in [("train", train_loader), ("val", val_loader)]:
+			if phase == "train":
+				model.train()
+			else:
+				model.eval()
+			y_true, y_pred = [], []
+			coord_trues, coord_preds = [], []
+			sum_loss = num_loss = 0
+			for imgs, labels, coords in loader:
+				imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
+				with torch.set_grad_enabled(phase == "train"):
+					logits, pred_coords = model(imgs)
+					loss = nn.CrossEntropyLoss()(logits, labels) + args.reg_loss_rate * nn.MSELoss()(coords, pred_coords)
+				if phase == "train":
+					optimiser.zero_grad()
+					loss.backward()
+					optimiser.step()
+				sum_loss += loss.item() * imgs.size(0)
+				num_loss += imgs.size(0)
+				preds = torch.argmax(logits, dim = -1)
+				y_true.append(labels.cpu().numpy())
+				y_pred.append(preds.cpu().numpy())
+				coord_trues.append(coords.cpu().numpy())
+				coord_preds.append(pred_coords.detach().cpu().numpy())
+			y_true, y_pred = np.concatenate(y_true, axis = 0), np.concatenate(y_pred, axis = 0)
+			coord_trues, coord_preds = np.concatenate(coord_trues, axis = 0), np.concatenate(coord_preds, axis = 0)
+			loss, acc, f1, l1 = sum_loss / num_loss, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro"), np.mean(np.abs(coord_trues - coord_preds))
+			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}, reg L1 = {:.4f}".format(epoch, phase, loss, acc, f1, l1), flush = True)
+			if phase == "val" and acc > max_acc:
+				max_acc, max_f1, max_l1, best_weights = acc, f1, l1, deepcopy(model.state_dict())
+				if max_acc > 0.65:
+					torch.save(best_weights, os.path.join(args.save_path, f"ckpt-{max_acc:.4f}.pt"))
+		print("Epoch time: {:.2f} mins".format((time.time() - st_time) / 60))
+		scheduler.step()
+	print("Max: ", max_acc, max_f1, max_l1)
 
-	y_true, y_pred = [], []
-	coord_trues, coord_preds = [], []
-	for imgs, labels, coords in val_loader:
-		imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
-		with torch.no_grad():
-			logits, pred_coords = model(imgs)
-			preds = torch.argmax(logits, dim = -1)
-			y_true.append(labels.cpu().numpy())
-			y_pred.append(preds.cpu().numpy())
-			coord_trues.append(coords.cpu().numpy())
-			coord_preds.append(pred_coords.detach().cpu().numpy())
-	y_true, y_pred = np.concatenate(y_true, axis = 0), np.concatenate(y_pred, axis = 0)
-	coord_trues, coord_preds = np.concatenate(coord_trues, axis = 0), np.concatenate(coord_preds, axis = 0)
-	acc, f1, l1 = accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro"), np.mean(np.abs(coord_trues - coord_preds))
-	print("Res: ", acc, f1, l1)
-	print("Confusion:\n", confusion_matrix(y_true, y_pred))
-	scatters = [[[], [], []] for i in range(args.num_classes)]
-	lb_to_colour = ["red", "green", "blue"]
-	correct_l1s, wrong_l1s = [], []
-	correct_yts, correct_yps, wrong_yts, wrong_yps = [], [], [], []
-
-	"""
-	for true_label, pred_label, t_c, p_c in zip(y_true, y_pred, coord_trues, coord_preds):
-		scatters[true_label][0].append(t_c)
-		scatters[true_label][1].append(p_c)
-		scatters[true_label][2].append(lb_to_colour[pred_label])
-		this_l1 = np.mean(np.abs(t_c - p_c))
-		if true_label == pred_label:
-			correct_l1s.append(this_l1)
-			correct_yts.append(t_c)
-			correct_yps.append(p_c)
-		else:
-			wrong_l1s.append(this_l1)
-			wrong_yts.append(t_c)
-			wrong_yps.append(p_c)
-	"""
-
-	window_size = 10
-
-	prev_labels = []
-	axial_len = 0
-	prev_pred_label = -1
-	momenteum = 0.8
-
-	adjusted_pred_axials, adjusted_pred_labels = [], []
-
-	for true_label, pred_label, true_axial, pred_axial in zip(y_true, y_pred, coord_trues, coord_preds):
-		prev_labels.append(pred_label)
-		if len(prev_labels) > window_size:
-			prev_labels.pop(0)
-		values, counts = np.unique(prev_labels, return_counts = True)
-		cur_label = values[np.argmax(counts)]
-		if cur_label != prev_pred_label:
-			axial_len = pred_axial
-		else:
-			axial_len = momenteum * axial_len + (1 - momenteum) * pred_axial
-		prev_pred_label = cur_label
-		adjusted_pred_labels.append(cur_label)
-		adjusted_pred_axials.append(axial_len)
-
-	print("Adjusted: acc {:.4f} f1 {:.4f} l1 {:.4f}".format(accuracy_score(y_true, adjusted_pred_labels), f1_score(y_true, adjusted_pred_labels, average = "macro"), np.mean(np.abs(adjusted_pred_axials - coord_trues))))
-
-
-	print(np.corrcoef(coord_trues.ravel(), coord_preds.ravel())[1][0], np.corrcoef(np.array(correct_yts).ravel(), np.array(correct_yps).ravel())[1][0], np.corrcoef(np.array(wrong_yts).ravel(), np.array(wrong_yps).ravel())[1][0])
-
-	print("Correct L1s: {:.4f}, Wrong L1s: {:.4f}".format(np.mean(correct_l1s), np.mean(wrong_l1s)))
-
-	"""
-	for i in range(args.num_classes):
-		plt.scatter(scatters[i][0], scatters[i][1], color = scatters[i][2])
-		plt.title(f"Class: {i}")
-		plt.show()
-	"""
 if __name__ == '__main__':
 	main()
