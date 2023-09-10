@@ -82,7 +82,7 @@ def get_transform(training, args):
 			img = resize(img)
 		img = (img - img.min()) / (img.max() - img.min())
 		if args.bins > 0:
-			img = torch.minimum(torch.floor(img * args.bins), args.bins - 1) / args.bins
+			img = torch.minimum(torch.floor(img * args.bins), torch.tensor(args.bins - 1)) / args.bins
 		if args.normalise:
 			img = normalise(img)
 		return img.repeat(args.n_channels, 1, 1)
