@@ -21,7 +21,7 @@ def rotate_and_crop(img, deg, img_size):
 	st = (img.shape[0] - img_size) // 2
 	return img[st : st + img_size, st : st + img_size]
 
-def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_path, num_samples, img_size, out_pose_only = False, norm_img = False, zoom_scale = 2 ** -0.5, suffix = "", axial_extend_rate = 0.05, radial_safe_rate = 0.96, min_depth_thres = 3, max_num_iters = 2.5):
+def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_path, num_samples, img_size, max_axial_len, max_radius, out_pose_only = False, norm_img = False, zoom_scale = 2 ** -0.5, suffix = "", axial_extend_rate = 0.05, radial_safe_rate = 0.96, min_depth_thres = 3, max_num_iters = 2.5):
 	all_cls = load_all_cls_npy(seg_cl_path)
 
 	plotter, zoomed_size = get_zoomed_plotter(img_size, zoom_scale)
@@ -52,6 +52,7 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 			cl_point_base = points[on_line_idx]
 			cl_orientation, axial_len, lumen_radius = get_direction_dist_radius(all_cls, (cl_idx, on_line_idx))
 			total_axial_len += axial_len
+
 		sum_axial_len = 0
 		for on_line_idx in tqdm(range(len(points) - 1)):
 			cl_point_base = points[on_line_idx]
@@ -134,11 +135,11 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 
 				num_gen_samples += 1
 				out_pose = np.stack([t_position, t_orientation, t_up], axis = 0)
-				cl_pose = np.array([cl_idx, (sum_axial_len + axial_norm) / total_axial_len, radial_norm / lumen_radius, radial_rot, total_axial_len])
+				cl_pose = np.array([cl_idx, (sum_axial_len + axial_norm) / max_axial_len, radial_norm / max_radius, radial_rot])
 				all_pose = np.concatenate([cl_pose, out_pose.ravel()], axis = 0)
 
 				out_imgs_cache[img_idx] = dep
-				out_labels.append(cl_pose.astype(np.float32))
+				out_labels.append(all_pose.astype(np.float32))
 
 				"""
 				np.savetxt(os.path.join(output_path, f"{img_idx:06d}.txt"), out_pose, fmt = "%.6f")
@@ -158,6 +159,9 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 				img_idx += 1
 
 			sum_axial_len += axial_len
+			if sum_axial_len > max_axial_len:
+				break
+	
 	out_labels = np.stack(out_labels, axis = 0)
 	np.save(f"./train_{suffix}_img.npy", out_imgs_cache[ : len(out_labels), ...])
 	np.save(f"./train_{suffix}_label.npy", out_labels)

@@ -20,6 +20,8 @@ def get_args():
 	parser.add_argument("--rotatable", action = "store_true", default = False)
 	parser.add_argument("--view-angle", type = float, default = 90)
 	parser.add_argument("--suffix", type = str, default = "")
+	parser.add_argument("--max-axial-len", type = float, default = 120)
+	parser.add_argument("--max-radius", type = float, default = 10)
 
 	return parser.parse_args()
 
@@ -32,7 +34,7 @@ def main():
 	reference_path = os.path.join(args.output_path + "_ref", args.partition)
 	os.makedirs(reference_path, exist_ok = True)
 
-	generate_rotatable_images(args.mesh_path, args.seg_cl_path, output_path, reference_path, args.num_samples, args.img_size, args.out_pose_only, args.norm_img, (2 ** -0.5) if args.rotatable else 1.0, args.suffix)
+	generate_rotatable_images(args.mesh_path, args.seg_cl_path, output_path, reference_path, args.num_samples, args.img_size, args.max_axial_len, args.max_radius, args.out_pose_only, args.norm_img, (2 ** -0.5) if args.rotatable else 1.0, args.suffix)
 
 if __name__ == '__main__':
 	main()

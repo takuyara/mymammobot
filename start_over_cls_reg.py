@@ -49,6 +49,7 @@ def get_args():
 	parser.add_argument("--amsgrad", action = "store_true", default = False)
 	parser.add_argument("--step-lr-size", type = int, default = 10)
 	parser.add_argument("--max-rot-angle", type = float, default = 0)
+	parser.add_argument("--bins", type = int, default = 0)
 	return parser.parse_args()
 
 
@@ -80,6 +81,8 @@ def get_transform(training, args):
 		else:
 			img = resize(img)
 		img = (img - img.min()) / (img.max() - img.min())
+		if args.bins > 0:
+			img = torch.minimum(torch.floor(img * args.bins), args.bins - 1) / args.bins
 		if args.normalise:
 			img = normalise(img)
 		return img.repeat(args.n_channels, 1, 1)
