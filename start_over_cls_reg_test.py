@@ -230,12 +230,14 @@ def main():
 			wrong_yps.append(p_c)
 	"""
 
-	window_size = 10
+	window_size = 25
 
-	prev_labels = []
+	prev_labels = [0] * window_size
 	axial_len = 0
-	prev_pred_label = -1
+	prev_pred_label = 0
 	momenteum = 0.8
+
+	switch_from_axial = {0: 1, 1: 0, 2: 0}
 
 	adjusted_pred_axials, adjusted_pred_labels = [], []
 
@@ -245,10 +247,25 @@ def main():
 			prev_labels.pop(0)
 		values, counts = np.unique(prev_labels, return_counts = True)
 		cur_label = values[np.argmax(counts)]
+		strength = np.max(counts) / len(prev_labels)
+
 		if cur_label != prev_pred_label:
+			#print("Changing axial", prev_pred_label, cur_label, pred_axial)
+			if strength > 0.7 or (abs(switch_from_axial[prev_pred_label] - axial_len) < 0.2):
+				pass
+			else:
+				#print("Failed.")
+				cur_label = prev_pred_label
+			"""
+			if prev_pred_label in [1, 2] and cur_label == 0:
+				# From 1 to 0
+				axial_len = 1
+			else:
+				# From 0 to 0
+				axial_len = 0
+			"""
 			axial_len = pred_axial
-		else:
-			axial_len = momenteum * axial_len + (1 - momenteum) * pred_axial
+		axial_len = momenteum * axial_len + (1 - momenteum) * pred_axial
 		prev_pred_label = cur_label
 		adjusted_pred_labels.append(cur_label)
 		adjusted_pred_axials.append(axial_len)

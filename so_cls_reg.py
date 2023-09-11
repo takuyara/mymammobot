@@ -46,7 +46,9 @@ def get_args():
 	parser.add_argument("--cls-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
 	parser.add_argument("--reg-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
 	parser.add_argument("--amsgrad", action = "store_true", default = False)
-	parser.add_argument("--step-lr-size", type = int, default = 10)
+	parser.add_argument("--step-lr-size", type = int, default = 200)
+	parser.add_argument("--bins", type = int, default = 0)
+	parser.add_argument("--rescaler-bins", type = int, default = 0)
 	return parser.parse_args()
 
 
@@ -75,6 +77,9 @@ def get_transform(training, args):
 		else:
 			img = resize(img)
 		img = (img - img.min()) / (img.max() - img.min())
+		if args.bins > 0:
+			print("Using histogram to reduce noise.")
+			img = torch.minimum(torch.floor(img * args.bins), torch.tensor(args.bins - 1)) / args.bins
 		if args.normalise:
 			img = normalise(img)
 		return img.repeat(args.n_channels, 1, 1)
@@ -113,6 +118,18 @@ class PreloadDataset(Dataset):
 	def __len__(self):
 		return len(self.img_data)
 
+class Rescaler(nn.Module):
+	def __init__(self, bins, dropout):
+		super(Rescaler, self).__init__()
+		self.mlp = get_mlp(bins, [32, 64, 128, 1], dropout)[0]
+		self.bins = bins
+	def forward(self, x):
+		hst = torch.stack([torch.histc(tx.flatten(), bins = self.bins, min = 0., max = 1.) for tx in torch.unbind(x)], dim = 0)
+		w = self.mlp(hst).unsqueeze(-1).unsqueeze(-1)
+		out = x * w
+		return out
+
+
 class ClsRegModel(nn.Module):
 	def __init__(self, base, args):
 		super(ClsRegModel, self).__init__()
@@ -121,6 +138,12 @@ class ClsRegModel(nn.Module):
 			self.batch_norm = nn.BatchNorm2d(args.n_channels)
 		else:
 			self.batch_norm = None
+		if args.rescaler_bins > 0:
+			print("Using rescaler.")
+			self.rescaler = Rescaler(args.rescaler_bins, args.dropout)
+		else:
+			self.rescaler = None
+
 		base.fc = nn.Sequential(nn.Linear(base.fc.in_features, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
 		self.base = base
 		if args.cls_neurons != [0]:
@@ -139,6 +162,8 @@ class ClsRegModel(nn.Module):
 	def forward(self, x):
 		if self.batch_norm is not None:
 			x = self.batch_norm(x)
+		if self.rescaler is not None:
+			x = self.rescaler(x)
 		x = self.base(x)
 		x_cls = self.mlp_cls(x) if self.mlp_cls is not None else x
 		x_reg = self.mlp_reg(x) if self.mlp_reg is not None else x
