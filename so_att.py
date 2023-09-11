@@ -136,12 +136,11 @@ class WeightedAvgPool(nn.Module):
 		super(WeightedAvgPool, self).__init__()
 		self.avgpool = nn.AdaptiveAvgPool2d(1)
 		self.reshapepool = nn.AdaptiveAvgPool2d(input_size)
-		self.dark_weight = nn.Parameter(torch.tensor(0.5))
-		self.light_weight_delta = nn.Parameter(torch.tensor(1.0))
+		self.light_weight = nn.Parameter(torch.tensor(0.0))
 	def forward(self, x, w):
 		w = self.reshapepool(w)
 		x = x.view(x.size(0), -1, w.size(2), w.size(3))
-		w = self.dark_weight * (torch.tensor(1.) - w) + (self.dark_weight + torch.relu(self.light_weight_delta)) * w
+		w = (torch.tensor(1.) - w) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w
 		#print(x.shape, w.shape)
 		x = x * w
 		x = self.avgpool(x)
