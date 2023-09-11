@@ -263,3 +263,23 @@ def cut_cls(all_cls, min_len = 30, get_tree_struct = False):
 
 	#print(current_segs)
 	return filtered_segs
+
+def get_cl_dist_sum(all_cls):
+	all_sums = []
+	for cl_idx in range(len(all_cls)):
+		sum_axials = []
+		sum_axial = 0
+		points = all_cls[cl_idx][0]
+		for on_line_idx in range(len(points) - 1):
+			axial_len = np.linalg.norm(points[on_line_idx, ...] - points[on_line_idx + 1, ...])
+			sum_axial += axial_len
+			sum_axials.append(sum_axial)
+		all_sums.append(sum_axials)
+	return all_sums
+
+def axial_to_cl_point_ori(all_cls, all_sums, cl_idx, axial_len):
+	on_line_idx = np.searchsorted(all_sums[cl_idx], axial_len, side = "right")[0]
+	residual_len = axial_len - all_sums[cl_idx][on_line_idx]
+	direction, __, ___ = get_direction_dist_radius(all_cls, (cl_idx, on_line_idx))
+	pt = all_cls[cl_idx][0][on_line_idx, ...] + direction * residual_len
+	return pt, direction
