@@ -252,7 +252,6 @@ def main():
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	model = get_model(args)
 	model = model.to(args.device)
-	print(model)
 	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr, amsgrad = args.amsgrad)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimiser, args.step_lr_size)
 	max_acc = 0
@@ -268,7 +267,6 @@ def main():
 			coord_trues, coord_preds = [], []
 			sum_loss = num_loss = 0
 			for imgs, labels, coords in loader:
-				print("Batch begin")
 				imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
 				with torch.set_grad_enabled(phase == "train"):
 					logits, pred_coords = model(imgs)
