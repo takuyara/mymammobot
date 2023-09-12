@@ -134,8 +134,6 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 					continue
 
 				if np.max(dep) < min_depth_thres:
-					plt.imshow(rgb)
-					plt.show()
 					continue
 
 				"""

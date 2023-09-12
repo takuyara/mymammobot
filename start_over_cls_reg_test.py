@@ -52,6 +52,12 @@ def get_args():
 	parser.add_argument("--ckpt-path", type = str, default = "")
 	parser.add_argument("--bins", type = int, default = 0)
 	parser.add_argument("--rescaler-bins", type = int, default = 0)
+	parser.add_argument("--dark-thres", type = float, default = 0.4)
+	parser.add_argument("--sigmoid-scale", type = float, default = 12.5)
+	parser.add_argument("--pool-input-size", type = int, default = 5)
+	parser.add_argument("--pre-weight", type = float, default = None)
+	parser.add_argument("--pool-channels", type = int, default = 2048)
+
 
 	return parser.parse_args()
 
@@ -132,6 +138,31 @@ class Rescaler(nn.Module):
 		out = x * w
 		return out
 
+class WeightedAvgPool(nn.Module):
+	def __init__(self, args):
+		super(WeightedAvgPool, self).__init__()
+		self.avgpool = nn.AdaptiveAvgPool2d(1)
+		if args.pre_weight is not None:
+			base = np.log(args.pre_weight - 1) if args.pre_weight > 1 else 1e-10
+			self.light_weight = nn.Parameter(torch.tensor(base), requires_grad = False)
+		else:
+			self.light_weight = nn.Parameter(torch.tensor(0.0), requires_grad = True)
+		#print("Param: ", torch.tensor(1.) + torch.exp(self.light_weight))
+		self.sgm_loc, self.sgm_scale = args.dark_thres, args.sigmoid_scale
+		self.pool_kernel = args.target_size // args.pool_input_size
+	def forward(self, x, w):
+		w = F.sigmoid((w - self.sgm_loc) * self.sgm_scale)
+		w = F.avg_pool2d(w, self.pool_kernel)
+		x = x.view(x.size(0), -1, w.size(2), w.size(3))
+		#print("Mask avg", w.mean().item())
+		w = (torch.tensor(1.) - w) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w
+		#print("Valued Mask avg", w.mean().item())
+		#print(x.shape, w.shape)
+		#print("Prev mean", x.mean().item())
+		x = x * w
+		#print("Weighted mean", x.mean().item())
+		x = self.avgpool(x)
+		return x
 
 class ClsRegModel(nn.Module):
 	def __init__(self, base, args):

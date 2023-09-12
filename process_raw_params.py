@@ -94,6 +94,10 @@ def main():
 
 
 	print(focal_length, np.mean(rates))
+
+	plt.hist(rates, range = (0, 50))
+	plt.show()
+
 	exit()
 
 	with open("params_new_non_interp.csv", "w", newline = "") as f:

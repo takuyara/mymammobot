@@ -5,13 +5,17 @@ import argparse
 from torch import nn
 from copy import deepcopy
 import numpy as np
+import pyvista as pv
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix
 import matplotlib.pyplot as plt
 from utils.misc import randu_gen
 from models.model_utils import get_mlp
+from ds_gen.depth_map_generation import get_depth_map
+from utils.cl_utils import load_all_cls_npy, get_cl_dist_sum, axial_to_cl_point_ori
+from utils.geometry import arbitrary_perpendicular_vector
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -46,8 +50,7 @@ def get_args():
 	parser.add_argument("--normalise", action = "store_true", default = False)
 	parser.add_argument("--cls-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
 	parser.add_argument("--reg-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
-	parser.add_argument("--amsgrad", action = "store_true", default = False)
-	parser.add_argument("--step-lr-size", type = int, default = 200)
+	parser.add_argument("--ckpt-path", type = str, default = "")
 	parser.add_argument("--bins", type = int, default = 0)
 	parser.add_argument("--rescaler-bins", type = int, default = 0)
 	parser.add_argument("--dark-thres", type = float, default = 0.4)
@@ -55,7 +58,8 @@ def get_args():
 	parser.add_argument("--pool-input-size", type = int, default = 5)
 	parser.add_argument("--pre-weight", type = float, default = None)
 	parser.add_argument("--pool-channels", type = int, default = 2048)
-	parser.add_argument("--resume", type = str, default = None)
+
+
 	return parser.parse_args()
 
 
@@ -66,10 +70,9 @@ def get_transform(training, args):
 	# Original params: 50, 5, 0.1, 0.5, 220
 	# Not working params: 70, 6, 0.25, 0.75, 180
 	elastic = transforms.ElasticTransform(alpha = 50., sigma = 5.)
-	persp = transforms.RandomPerspective(distortion_scale = 0.15, p = 0.5)
+	persp = transforms.RandomPerspective(distortion_scale = 0.1, p = 0.5)
 	crop_train = transforms.RandomResizedCrop(args.target_size, scale = (0.9, 1.0), ratio = (0.95, 1.05))
 	resize = transforms.Resize(args.target_size)
-	mask_resize = transforms.Resize(args.pool_input_size)
 	normalise = transforms.Normalize((0.1109, ), (0.1230, ))
 	def fun(img):
 		img = torch.tensor(img).unsqueeze(0)
@@ -86,8 +89,9 @@ def get_transform(training, args):
 			img = resize(img)
 		img = (img - img.min()) / (img.max() - img.min())
 		if args.bins > 0:
-			print("Using histogram to reduce noise.")
 			img = torch.minimum(torch.floor(img * args.bins), torch.tensor(args.bins - 1)) / args.bins
+		if args.normalise:
+			img = normalise(img)
 		return img.repeat(args.n_channels, 1, 1)
 	return fun
 
@@ -147,7 +151,6 @@ class WeightedAvgPool(nn.Module):
 		#print("Param: ", torch.tensor(1.) + torch.exp(self.light_weight))
 		self.sgm_loc, self.sgm_scale = args.dark_thres, args.sigmoid_scale
 		self.pool_kernel = args.target_size // args.pool_input_size
-		self.dropout = nn.Dropout2d(args.dropout)
 	def forward(self, x, w):
 		w = F.sigmoid((w - self.sgm_loc) * self.sgm_scale)
 		w = F.avg_pool2d(w, self.pool_kernel)
@@ -157,29 +160,20 @@ class WeightedAvgPool(nn.Module):
 		#print("Valued Mask avg", w.mean().item())
 		#print(x.shape, w.shape)
 		#print("Prev mean", x.mean().item())
-		x = self.dropout(x * w)
+		x = x * w
 		#print("Weighted mean", x.mean().item())
 		x = self.avgpool(x)
-		return x
-
-class PlaceHolder(nn.Module):
-	def __init__(self):
-		super(PlaceHolder, self).__init__()
-	def forward(self, x):
-		print("Input Placeholder: ", x.shape)
 		return x
 
 class ClsRegModel(nn.Module):
 	def __init__(self, base, args):
 		super(ClsRegModel, self).__init__()
-		self.dark_thres = args.dark_thres
 		self.base = base
 		if args.uses_bn:
 			self.batch_norm = nn.BatchNorm2d(args.n_channels)
 		else:
 			self.batch_norm = None
 		if args.rescaler_bins > 0:
-			print("Using rescaler.")
 			self.rescaler = Rescaler(args.rescaler_bins, args.dropout)
 		else:
 			self.rescaler = None
@@ -209,11 +203,10 @@ class ClsRegModel(nn.Module):
 		if self.rescaler is not None:
 			x = self.rescaler(x)
 		x = self.base(x)
-		#print("Forward: ", x.shape)
 		x = self.base_pool(x, orig_input)
-		#print(x.shape)
 		x = x.view(x.size(0), -1)
 		x = self.base_fc(x)
+
 		x_cls = self.mlp_cls(x) if self.mlp_cls is not None else x
 		x_reg = self.mlp_reg(x) if self.mlp_reg is not None else x
 		out_cls = self.out_cls(x_cls)
@@ -256,61 +249,154 @@ def get_model(args):
 
 def main():
 	args = get_args()
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
+	all_cls = load_all_cls_npy("./seg_cl_1")
+	all_cl_sums = get_cl_dist_sum(all_cls)
 	print(args)
 	if args.four_fold:
 		args.num_classes = 4
-	train_set = PreloadDataset(os.path.join(args.base_path, f"{args.train_path}_img.npy"), os.path.join(args.base_path, f"{args.train_path}_label.npy"), get_transform(True, args), args)
-	print("Train load done.", flush = True)
 	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args), args)
 	print("Val load done.", flush = True)
-	train_loader = DataLoader(train_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = True)
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	model = get_model(args)
 	model = model.to(args.device)
-	if args.resume is not None:
-		print("Resuming from ", args.resume, flush = True)
-		model.load_state_dict(torch.load(os.path.join(args.save_path, args.resume)))
-	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr, amsgrad = args.amsgrad)
-	scheduler = torch.optim.lr_scheduler.StepLR(optimiser, args.step_lr_size)
-	max_acc = 0
-	torch.autograd.set_detect_anomaly(True)
-	for epoch in range(args.epochs):
-		st_time = time.time()
-		for phase, loader in [("train", train_loader), ("val", val_loader)]:
-			if phase == "train":
-				model.train()
-			else:
-				model.eval()
-			y_true, y_pred = [], []
-			coord_trues, coord_preds = [], []
-			sum_loss = num_loss = 0
-			for imgs, labels, coords in loader:
-				imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
-				with torch.set_grad_enabled(phase == "train"):
-					logits, pred_coords = model(imgs)
-					loss = nn.CrossEntropyLoss()(logits, labels) + args.reg_loss_rate * nn.MSELoss()(coords, pred_coords)
-				if phase == "train":
-					optimiser.zero_grad()
-					loss.backward()
-					optimiser.step()
-				sum_loss += loss.item() * imgs.size(0)
-				num_loss += imgs.size(0)
-				preds = torch.argmax(logits, dim = -1)
-				y_true.append(labels.cpu().numpy())
-				y_pred.append(preds.cpu().numpy())
-				coord_trues.append(coords.cpu().numpy())
-				coord_preds.append(pred_coords.detach().cpu().numpy())
-			y_true, y_pred = np.concatenate(y_true, axis = 0), np.concatenate(y_pred, axis = 0)
-			coord_trues, coord_preds = np.concatenate(coord_trues, axis = 0), np.concatenate(coord_preds, axis = 0)
-			loss, acc, f1, l1 = sum_loss / num_loss, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro"), np.mean(np.abs(coord_trues - coord_preds))
-			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}, reg L1 = {:.4f}".format(epoch, phase, loss, acc, f1, l1), flush = True)
-			if phase == "val" and acc > max_acc:
-				max_acc, max_f1, max_l1, best_weights = acc, f1, l1, deepcopy(model.state_dict())
-				if max_acc > 0.65:
-					torch.save(best_weights, os.path.join(args.save_path, f"ckpt-{max_acc:.4f}.pt"))
-		print("Epoch time: {:.2f} mins".format((time.time() - st_time) / 60))
-		scheduler.step()
-	print("Max: ", max_acc, max_f1, max_l1)
+	model.load_state_dict(torch.load(os.path.join(args.save_path, args.ckpt_path)))
+	model.eval()
+	print(model.base_pool.light_weight)
 
+	y_true, y_pred = [], []
+	coord_trues, coord_preds = [], []
+	pred_probs = []
+	all_imgs = []
+	for imgs, labels, coords in val_loader:
+		imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
+		with torch.no_grad():
+			logits, pred_coords = model(imgs)
+			probs = torch.softmax(logits, dim = -1)
+			preds = torch.argmax(logits, dim = -1)
+			y_true.append(labels.cpu().numpy())
+			y_pred.append(preds.cpu().numpy())
+			coord_trues.append(coords.cpu().numpy())
+			coord_preds.append(pred_coords.detach().cpu().numpy())
+			pred_probs.append(probs.detach().cpu().numpy())
+			all_imgs.append(imgs.cpu().numpy())
+	y_true, y_pred = np.concatenate(y_true, axis = 0), np.concatenate(y_pred, axis = 0)
+	coord_trues, coord_preds = np.concatenate(coord_trues, axis = 0), np.concatenate(coord_preds, axis = 0)
+	pred_probs = np.concatenate(pred_probs, axis = 0)
+	all_imgs = np.concatenate(all_imgs, axis = 0)
+	acc, f1, l1 = accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro"), np.mean(np.abs(coord_trues - coord_preds))
+	print("Res: ", acc, f1, l1)
+	print("Confusion:\n", confusion_matrix(y_true, y_pred))
+	scatters = [[[], [], []] for i in range(args.num_classes)]
+	lb_to_colour = ["red", "green", "blue"]
+	correct_l1s, wrong_l1s = [], []
+	correct_yts, correct_yps, wrong_yts, wrong_yps = [], [], [], []
+
+	"""
+	for true_label, pred_label, t_c, p_c in zip(y_true, y_pred, coord_trues, coord_preds):
+		scatters[true_label][0].append(t_c)
+		scatters[true_label][1].append(p_c)
+		scatters[true_label][2].append(lb_to_colour[pred_label])
+		this_l1 = np.mean(np.abs(t_c - p_c))
+		if true_label == pred_label:
+			correct_l1s.append(this_l1)
+			correct_yts.append(t_c)
+			correct_yps.append(p_c)
+		else:
+			wrong_l1s.append(this_l1)
+			wrong_yts.append(t_c)
+			wrong_yps.append(p_c)
+	"""
+
+	window_size = 25
+
+	prev_labels = [0] * window_size
+	axial_len = 0
+	prev_pred_label = 0
+	momenteum = 0.8
+
+	switch_from_axial = {0: 1, 1: 0, 2: 0}
+
+	adjusted_pred_axials, adjusted_pred_labels, adjusted_pred_labels_prob = [], [], []
+
+	prev_pred_probs = np.array([1, 0, 0])
+
+	for true_label, pred_label, true_axial, pred_axial, pred_prob, input_img in zip(y_true, y_pred, coord_trues, coord_preds, pred_probs, all_imgs):
+		"""
+		if true_label != pred_label and true_label == 0:
+			cl_pt, cl_dir = axial_to_cl_point_ori(all_cls, all_cl_sums, pred_label, pred_axial * 120)
+			up = arbitrary_perpendicular_vector(cl_dir)
+			rgb, dep = get_depth_map(p, cl_pt, cl_dir, up, get_outputs = True)
+			dep = transforms.GaussianBlur(21, 7)(torch.tensor(dep).unsqueeze(0)).squeeze().numpy()
+			plt.subplot(1, 3, 1)
+			plt.imshow(dep)
+			plt.subplot(1, 3, 2)
+			plt.imshow(rgb)
+			plt.subplot(1, 3, 3)
+			plt.imshow(input_img.reshape(input_img.shape[-2], input_img.shape[-1]))
+			plt.suptitle("Predicted: {} Axial: {}, Orig axial: {}".format(pred_label, pred_axial, true_axial))
+			plt.show()
+		"""
+
+
+		prev_labels.append(pred_label)
+		if len(prev_labels) > window_size:
+			prev_labels.pop(0)
+		values, counts = np.unique(prev_labels, return_counts = True)
+		cur_label = values[np.argmax(counts)]
+		strength = np.max(counts) / len(prev_labels)
+
+		prev_pred_probs = prev_pred_probs * momenteum + pred_prob * (1 - momenteum)
+
+		if cur_label != prev_pred_label:
+			#print("Changing axial", prev_pred_label, cur_label, pred_axial)
+			if strength > 0.7 or (abs(switch_from_axial[prev_pred_label] - axial_len) < 0.2):
+				pass
+			else:
+				#print("Failed.")
+				cur_label = prev_pred_label
+			"""
+			if prev_pred_label in [1, 2] and cur_label == 0:
+				# From 1 to 0
+				axial_len = 1
+			else:
+				# From 0 to 0
+				axial_len = 0
+			"""
+			axial_len = pred_axial
+		axial_len = momenteum * axial_len + (1 - momenteum) * pred_axial
+		prev_pred_label = cur_label
+		adjusted_pred_labels.append(cur_label)
+		adjusted_pred_axials.append(axial_len)
+		adjusted_pred_labels_prob.append(np.argmax(prev_pred_probs))
+
+	"""
+	plt.plot(y_pred, label = "Pred")
+	plt.plot(y_true, label = "True")
+	plt.title("Types")
+	plt.show()
+	
+	plt.plot(coords_pred, label = "Pred")
+	plt.plot(coords_true, label = "True")
+	plt.title("Coords")
+	plt.show()
+	"""
+
+
+	print("Adjusted: acc {:.4f} f1 {:.4f} l1 {:.4f}".format(accuracy_score(y_true, adjusted_pred_labels), f1_score(y_true, adjusted_pred_labels, average = "macro"), np.mean(np.abs(adjusted_pred_axials - coord_trues))))
+	print("Adjusted with prob acc: {:.4f} f1: {:.4f}.".format(accuracy_score(y_true, adjusted_pred_labels_prob), f1_score(y_true, adjusted_pred_labels_prob, average = "macro")))
+
+
+	print(np.corrcoef(coord_trues.ravel(), coord_preds.ravel())[1][0], np.corrcoef(np.array(correct_yts).ravel(), np.array(correct_yps).ravel())[1][0], np.corrcoef(np.array(wrong_yts).ravel(), np.array(wrong_yps).ravel())[1][0])
+
+	print("Correct L1s: {:.4f}, Wrong L1s: {:.4f}".format(np.mean(correct_l1s), np.mean(wrong_l1s)))
+
+	"""
+	for i in range(args.num_classes):
+		plt.scatter(scatters[i][0], scatters[i][1], color = scatters[i][2])
+		plt.title(f"Class: {i}")
+		plt.show()
+	"""
 if __name__ == '__main__':
 	main()
