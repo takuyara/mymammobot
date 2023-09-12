@@ -5,6 +5,7 @@ import argparse
 from torch import nn
 from copy import deepcopy
 import numpy as np
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import models, transforms
 from sklearn.metrics import accuracy_score, f1_score
@@ -49,8 +50,11 @@ def get_args():
 	parser.add_argument("--step-lr-size", type = int, default = 200)
 	parser.add_argument("--bins", type = int, default = 0)
 	parser.add_argument("--rescaler-bins", type = int, default = 0)
-	parser.add_argument("--dark-thres", type = float, default = 0.5)
+	parser.add_argument("--dark-thres", type = float, default = 0.4)
+	parser.add_argument("--sigmoid-scale", type = float, default = 12.5)
 	parser.add_argument("--pool-input-size", type = int, default = 5)
+	parser.add_argument("--pre-weight", type = float, default = None)
+	parser.add_argument("--pool-channels", type = int, default = 2048)
 	return parser.parse_args()
 
 
@@ -64,6 +68,7 @@ def get_transform(training, args):
 	persp = transforms.RandomPerspective(distortion_scale = 0.15, p = 0.5)
 	crop_train = transforms.RandomResizedCrop(args.target_size, scale = (0.9, 1.0), ratio = (0.95, 1.05))
 	resize = transforms.Resize(args.target_size)
+	mask_resize = transforms.Resize(args.pool_input_size)
 	normalise = transforms.Normalize((0.1109, ), (0.1230, ))
 	def fun(img):
 		img = torch.tensor(img).unsqueeze(0)
@@ -82,8 +87,6 @@ def get_transform(training, args):
 		if args.bins > 0:
 			print("Using histogram to reduce noise.")
 			img = torch.minimum(torch.floor(img * args.bins), torch.tensor(args.bins - 1)) / args.bins
-		if args.normalise:
-			img = normalise(img)
 		return img.repeat(args.n_channels, 1, 1)
 	return fun
 
@@ -132,17 +135,28 @@ class Rescaler(nn.Module):
 		return out
 
 class WeightedAvgPool(nn.Module):
-	def __init__(self, input_size):
+	def __init__(self, args):
 		super(WeightedAvgPool, self).__init__()
 		self.avgpool = nn.AdaptiveAvgPool2d(1)
-		self.reshapepool = nn.AdaptiveAvgPool2d(input_size)
-		self.light_weight = nn.Parameter(torch.tensor(0.0))
+		if args.pre_weight is not None:
+			base = np.log(args.pre_weight - 1) if args.pre_weight > 1 else 1e-10
+			self.light_weight = nn.Parameter(torch.tensor(base), requires_grad = False)
+		else:
+			self.light_weight = nn.Parameter(torch.tensor(0.0), requires_grad = True)
+		#print("Param: ", torch.tensor(1.) + torch.exp(self.light_weight))
+		self.sgm_loc, self.sgm_scale = args.dark_thres, args.sigmoid_scale
+		self.pool_kernel = args.target_size // args.pool_input_size
 	def forward(self, x, w):
-		w = self.reshapepool(w)
+		w = F.sigmoid((w - self.sgm_loc) * self.sgm_scale)
+		w = F.avg_pool2d(w, self.pool_kernel)
 		x = x.view(x.size(0), -1, w.size(2), w.size(3))
+		#print("Mask avg", w.mean().item())
 		w = (torch.tensor(1.) - w) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w
+		#print("Valued Mask avg", w.mean().item())
 		#print(x.shape, w.shape)
+		#print("Prev mean", x.mean().item())
 		x = x * w
+		#print("Weighted mean", x.mean().item())
 		x = self.avgpool(x)
 		return x
 
@@ -168,7 +182,7 @@ class ClsRegModel(nn.Module):
 		else:
 			self.rescaler = None
 
-		self.base_pool = WeightedAvgPool(args.pool_input_size)
+		self.base_pool = WeightedAvgPool(args)
 		self.base_fc = nn.Sequential(nn.Linear(base.fc.in_features, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
 		base.avgpool = nn.Identity()
 		base.fc = nn.Identity()
@@ -187,14 +201,14 @@ class ClsRegModel(nn.Module):
 		else:
 			self.out_reg = nn.Linear(reg_final_dim, args.reg_dims)
 	def forward(self, x):
-		w = (x > self.dark_thres).float()
+		orig_input = x
 		if self.batch_norm is not None:
 			x = self.batch_norm(x)
 		if self.rescaler is not None:
 			x = self.rescaler(x)
 		x = self.base(x)
 		#print("Forward: ", x.shape)
-		x = self.base_pool(x, w)
+		x = self.base_pool(x, orig_input)
 		#print(x.shape)
 		x = x.view(x.size(0), -1)
 		x = self.base_fc(x)

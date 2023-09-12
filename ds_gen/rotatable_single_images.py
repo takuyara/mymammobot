@@ -21,7 +21,7 @@ def rotate_and_crop(img, deg, img_size):
 	st = (img.shape[0] - img_size) // 2
 	return img[st : st + img_size, st : st + img_size]
 
-def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_path, num_samples, img_size, max_axial_len, max_radius, out_pose_only = False, norm_img = False, zoom_scale = 2 ** -0.5, suffix = "", axial_extend_rate = 0.05, radial_safe_rate = 0.96, min_depth_thres = 3, max_num_iters = 2.5):
+def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_path, num_samples, img_size, max_axial_len, max_radius, out_pose_only = False, norm_img = False, zoom_scale = 2 ** -0.5, suffix = "", axial_extend_rate = 0.05, radial_safe_rate = 0.96, min_depth_thres = 30, max_num_iters = 2.5):
 	all_cls = load_all_cls_npy(seg_cl_path)
 
 	plotter, zoomed_size = get_zoomed_plotter(img_size, zoom_scale)
@@ -137,6 +137,12 @@ def generate_rotatable_images(mesh_path, seg_cl_path, output_path, reference_pat
 					plt.imshow(rgb)
 					plt.show()
 					continue
+
+				"""
+				plt.imshow(rgb)
+				plt.title("Rate: {:.2f}, Max dep {:.2f}".format(focal_radial_norm / lumen_radius, np.max(dep)))
+				plt.show()
+				"""
 
 				num_gen_samples += 1
 				out_pose = np.stack([t_position, t_orientation, t_up], axis = 0)

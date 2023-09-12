@@ -16,7 +16,7 @@ def get_args():
 	parser.add_argument("--norm-img", action = "store_true", default = False)
 	parser.add_argument("--velocity-path", type = str, default = "velocity_res.csv")
 	parser.add_argument("--static-stats-path", type = str, default = "./ds_gen/static_distrib.json")
-	parser.add_argument("--focal-length", type = float, default = 100)
+	parser.add_argument("--focal-length", type = float, default = 50)
 	parser.add_argument("--rotatable", action = "store_true", default = False)
 	parser.add_argument("--view-angle", type = float, default = 90)
 	parser.add_argument("--suffix", type = str, default = "")
