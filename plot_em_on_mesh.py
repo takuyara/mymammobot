@@ -4,9 +4,9 @@ import numpy as np
 import pyvista as pv
 
 airway_path = "./meshes/Airway_Phantom_AdjustSmooth.stl"
-em_path = "E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_16-04-19_Phantom_1\\EM"
+#em_path = "E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_16-04-19_Phantom_1\\EM"
 #em_path = "E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_17-08-08_Phantom_2\\EM"
-#em_path = "E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_17-12-48_Phantom_3\\EM"
+em_path = "E:\\nn-data\\MAMMOBOT-Original\\Dataset_20151113\\Dataset_20151113\\EM_Video_sequences\\logfile_2015-11-13_17-12-48_Phantom_3\\EM"
 
 def em_to_poly(path):
 	all_res = [["idx", "x", "y", "z", "qw", "qx", "qy", "qz"]]
@@ -28,10 +28,10 @@ def em_to_poly(path):
 
 def main():
 	airway = pv.read(airway_path)
-	p = pv.Plotter()
+	p = pv.Plotter(window_size = (600, 800))
 	p.add_mesh(airway, opacity = 0.5)
 	tube = em_to_poly(em_path)
-	p.add_mesh(tube, color = "red")
+	p.add_mesh(tube, color = "blue")
 	p.show()
 
 if __name__ == '__main__':

@@ -13,8 +13,8 @@ from ds_gen.depth_map_generation import get_depth_map
 import matplotlib.pyplot as plt
 
 airway_path = "./meshes/Airway_Phantom_AdjustSmooth.stl"
-cl_path = "./CL1"
-out_path = "./seg_cl_1"
+cl_path = "./CL"
+out_path = "./seg_cl_0"
 
 cl_paths = [os.path.join(cl_path, t_path) for t_path in os.listdir(cl_path) if t_path.endswith(".dat")]
 
@@ -85,20 +85,24 @@ def main():
 	new_cls = cut_cls(all_cls)
 
 	#segs = get_unique_cl_indices(all_cls, flatten = False)
+	all_radii = []
 	for i, this_seg_a in enumerate(new_cls):
 		this_seg, radius = this_seg_a
 		#print(this_seg)
-		print(i, len(this_seg), np.mean(radius))
+		#print(i, len(this_seg), np.mean(radius))
 		if len(this_seg) < 30:
 			continue
 		if len(this_seg) == 42 or len(this_seg) == 408:
 			# Should merge these 2 segs when using full CL
 			pass
 		p.add_mesh(p2p(this_seg), color = pv.Color(colour_names[i % len(colour_names)]))
-		print(this_seg.shape, radius.shape)
-		out = np.concatenate([this_seg, radius.reshape(-1, 1)], axis = -1)
-		print(out.shape)
-		np.save(os.path.join(out_path, f"CL{i}.npy"), out)
+		#print(this_seg.shape, radius.shape)
+		#out = np.concatenate([this_seg, radius.reshape(-1, 1)], axis = -1)
+		all_radii.append(radius)
+		#print(out.shape)
+		#np.save(os.path.join(out_path, f"CL{i}.npy"), out)
+
+
 
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
@@ -152,11 +156,16 @@ def main():
 		p.add_mesh(cl_to_poly(path), color = "blue")
 	"""
 
-	p.add_points(points, render_points_as_spheres = True, point_size = 2, color = "black")
+	#p.add_points(points, render_points_as_spheres = True, point_size = 2, color = "black")
 
 	#p.add_points(gen_points_t, render_points_as_spheres = True, point_size = 5, color = "yellow")
 	#p.add_points(gen_points, render_points_as_spheres = True, point_size = 5, color = "green")
-	p.show()
+	#p.show()
+
+	plt.hist(np.concatenate(all_radii), bins = 20, density = True)
+	plt.xlabel("Lumen Radius (Millimetres)")
+	plt.ylabel("Distribution Density")
+	plt.show()
 
 if __name__ == '__main__':
 	main()

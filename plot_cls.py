@@ -20,27 +20,41 @@ def cl_to_poly(path):
 			scalars.append(float(row["MaximumInscribedSphereRadius"]))
 	points = np.array(points)
 	scalars = np.array(scalars)
+	all_lens = []
+	for i in range(len(points) - 1):
+		t_len = np.linalg.norm(points[i] - points[i + 1])
+		all_lens.append(t_len)
 	poly = pv.lines_from_points(points)
 	poly["scalars"] = scalars
 	tube = poly.tube(radius = 0.5)
-	return tube
+	return tube, np.array(all_lens), scalars
 
 def main():
 	print(len(cl_paths))
 	airway = pv.read(airway_path)
 	p = pv.Plotter()
-	#p.add_mesh(airway, color = "grey", opacity = 0.2)
+	p.add_mesh(airway, color = "grey", opacity = 0.2)
+	"""
 	p.add_mesh_clip_box(airway)
 	p.show()
 	print(p.box_clipped_meshes)
-	exit()
+	"""
 
-
+	"""
 	for i, path in enumerate(cl_paths):
 		tube = cl_to_poly(path)
 		p.add_mesh(tube, color = colours[i], label = f"CL_{i}")
 	p.add_legend()
 	p.show()
+	"""
+	all_lens, all_radii = [], []
+	sum_lens = []
+	for path in cl_paths:
+		__, t_all_lens, t_all_radii = cl_to_poly(path)
+		all_lens.append(t_all_lens)
+		all_radii.append(t_all_radii)
+		sum_lens.append(np.sum(t_all_lens))
+	print("CL Len: {:.1f}, {:.1f}, BTPT Len: {:.4f}, {:.4f}".format(np.mean(sum_lens), np.std(sum_lens), np.mean(t_all_lens), np.std(t_all_lens)))
 
 if __name__ == '__main__':
 	main()

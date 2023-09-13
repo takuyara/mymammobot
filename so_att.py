@@ -56,6 +56,7 @@ def get_args():
 	parser.add_argument("--pre-weight", type = float, default = None)
 	parser.add_argument("--pool-channels", type = int, default = 2048)
 	parser.add_argument("--resume", type = str, default = None)
+	parser.add_argument("--adv-scale", type = float, default = 0.02)
 	return parser.parse_args()
 
 
@@ -139,25 +140,12 @@ class WeightedAvgPool(nn.Module):
 	def __init__(self, args):
 		super(WeightedAvgPool, self).__init__()
 		self.avgpool = nn.AdaptiveAvgPool2d(1)
-		if args.pre_weight is not None:
-			base = np.log(args.pre_weight - 1) if args.pre_weight > 1 else 1e-10
-			self.light_weight = nn.Parameter(torch.tensor(base), requires_grad = False)
-		else:
-			self.light_weight = nn.Parameter(torch.tensor(0.0), requires_grad = True)
-		#print("Param: ", torch.tensor(1.) + torch.exp(self.light_weight))
-		self.sgm_loc, self.sgm_scale = args.dark_thres, args.sigmoid_scale
-		self.pool_kernel = args.target_size // args.pool_input_size
-		self.dropout = nn.Dropout2d(args.dropout)
 	def forward(self, x, w):
-		w = F.sigmoid((w - self.sgm_loc) * self.sgm_scale)
-		w = F.avg_pool2d(w, self.pool_kernel)
-		x = x.view(x.size(0), -1, w.size(2), w.size(3))
-		#print("Mask avg", w.mean().item())
-		w = (torch.tensor(1.) - w) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w
 		#print("Valued Mask avg", w.mean().item())
 		#print(x.shape, w.shape)
 		#print("Prev mean", x.mean().item())
 		#x = self.dropout(x * w)
+		x = x.view(x.size(0), -1, w.size(2), w.size(3))
 		x = x * w
 		#print("Weighted mean", x.mean().item())
 		x = self.avgpool(x)
@@ -173,6 +161,16 @@ class PlaceHolder(nn.Module):
 class ClsRegModel(nn.Module):
 	def __init__(self, base, args):
 		super(ClsRegModel, self).__init__()
+		if args.pre_weight is not None:
+			bb = np.log(args.pre_weight - 1) if args.pre_weight > 1 else 1e-10
+			self.light_weight = nn.Parameter(torch.tensor(bb), requires_grad = False)
+		else:
+			self.light_weight = nn.Parameter(torch.tensor(0.0), requires_grad = True)
+		#print("Param: ", torch.tensor(1.) + torch.exp(self.light_weight))
+		self.sgm_loc, self.sgm_scale = args.dark_thres, args.sigmoid_scale
+		self.pool_kernel = args.target_size // args.pool_input_size
+		self.adv_scale = args.adv_scale
+
 		self.dark_thres = args.dark_thres
 		self.base = base
 		if args.uses_bn:
@@ -204,14 +202,21 @@ class ClsRegModel(nn.Module):
 		else:
 			self.out_reg = nn.Linear(reg_final_dim, args.reg_dims)
 	def forward(self, x):
-		orig_input = x
+		w_lg = F.sigmoid((x - self.sgm_loc) * self.sgm_scale)
+		w_sm = F.avg_pool2d(w_lg, self.pool_kernel)
+		w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
+		w_lg = (torch.tensor(1.) - w_lg) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_lg
+		#print(w_sm.shape, w_lg.shape, flush = True)
+		if self.training and self.adv_scale > 0:
+			x = x + torch.randn_like(w_lg) * self.adv_scale * (torch.tensor(1.) - w_lg)
+
 		if self.batch_norm is not None:
 			x = self.batch_norm(x)
 		if self.rescaler is not None:
 			x = self.rescaler(x)
 		x = self.base(x)
 		#print("Forward: ", x.shape)
-		x = self.base_pool(x, orig_input)
+		x = self.base_pool(x, w_sm)
 		#print(x.shape)
 		x = x.view(x.size(0), -1)
 		x = self.base_fc(x)
