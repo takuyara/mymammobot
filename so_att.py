@@ -157,7 +157,8 @@ class WeightedAvgPool(nn.Module):
 		#print("Valued Mask avg", w.mean().item())
 		#print(x.shape, w.shape)
 		#print("Prev mean", x.mean().item())
-		x = self.dropout(x * w)
+		#x = self.dropout(x * w)
+		x = x * w
 		#print("Weighted mean", x.mean().item())
 		x = self.avgpool(x)
 		return x
