@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 from copy import deepcopy
 import shutil
 import sys
+import pyvista as pv
+from utils.misc import str_to_arr
+from ds_gen.depth_map_generation import get_depth_map
 
 from utils.stats import get_num_bins
 from pose_fixing.similarity import kl_sim, corr_sim, mi_sim, comb_corr_sim, dark_threshold_v, dark_threshold_r, cache_base_data, contour_sim, draw_contours
@@ -580,6 +583,125 @@ def plot_sim_scatter():
 	print(f"Cont sim right: {np.mean(cont_sims[1])} wrong: {np.mean(cont_sims[0])}")
 	print(f"Corr sim right: {np.mean(corr_sims[1])} wrong: {np.mean(corr_sims[0])}")
 
+def plot_final_fixes(show_fix):
+	out_path = "./depth-images/fix-final-confirmed-{}".format("with-gt" if show_fix else "without-gt")
+	#out_path = "./depth-images/fix-noproj-GSFonly"
+	os.makedirs(out_path, exist_ok = True)
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
+	uses_colorbar = False
+
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			plt.clf()
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			if human_eval != 1:
+				continue
+			position, orientation, up = str_to_arr(row["position"]), str_to_arr(row["orientation"]), str_to_arr(row["up"])
+			rgb_gt, dep_gt = get_depth_map(p, position, orientation, up, get_outputs = True)
+			rgb_gt = cv2.cvtColor(rgb_gt, cv2.COLOR_RGBA2GRAY)
+			dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+			dep_em = np.load(os.path.join(em_base_path, f"EM-virtual-RF-{em_idx}", f"{img_idx:06d}.npy"))
+			rgb_rc = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"), cv2.IMREAD_GRAYSCALE)
+			rgb_em = cv2.imread(os.path.join(em_base_path, f"EM-virtual-RF-{em_idx}", f"{img_idx:06d}.png"), cv2.IMREAD_GRAYSCALE)
+			rgb_rc = rgb_rc[9 : 255, ...]
+			#print(rgb_rc.shape)
+			rgb_gt = rgb_gt / 255.0
+			rgb_em = rgb_em / 255.0
+			rgb_rc = rgb_rc / 255.0
+			
+			if show_fix:
+				out_dt = [(rgb_rc, "GSF-RC"), (rgb_em, "GSF-EM"), (rgb_gt, "GSF-GT"), (dep_rc, "DM-RC-SFS"), (dep_em, "DM-EM-Mesh"), (dep_gt, "DM-GT-Mesh")]
+				num_plots = 2, 3
+			else:
+				out_dt = [(rgb_rc, "GSF-RC"), (rgb_em, "GSF-EM"), (dep_rc, "DM-RC-SFS"), (dep_em, "DM-EM-Mesh")]
+				num_plots = 2, 2
+			
+			"""
+			out_dt = [(rgb_rc, "GSF-RC"), (rgb_em, "GSF-EM")]
+			num_plots = 1, 2
+			"""
+
+			for i, (out_img, out_title) in enumerate(out_dt):
+				plt.subplot(*num_plots, i + 1)
+				if out_title.find("DM") != -1:
+					plt.imshow(out_img)
+				else:
+					plt.imshow(out_img, cmap = "gray", vmin = 0, vmax = 1)
+				if uses_colorbar:
+					plt.colorbar()
+				plt.axis("off")
+				plt.title(out_title)
+			plt.suptitle(f"REAL-{em_idx}-{img_idx}, {human_eval}")
+			#plt.suptitle(f"REAL-{em_idx}, Frame-{img_idx}")
+			#plt.show()
+			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
+
+def plot_out_img(proj, show_fix):
+	chosen_data = [(0, 24), (0, 644), (0, 822), (0, 1058), (1, 1926), (1, 2404), (2, 1320)]
+	out_path = "./depth-images/fix-final-selected-{}".format("with-gt" if show_fix else "without-gt")
+	os.makedirs(out_path, exist_ok = True)
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
+	uses_colorbar = False
+	proj_ident = "RF" if not proj else "PROJ"
+
+	plt.figure(figsize = (6, 3.5))
+	plt.subplots_adjust(left = 0.01, right = 0.99, top = 0.99, bottom = 0.04, hspace = 0.05, wspace = 0.05)
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			plt.clf()
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			if (em_idx, img_idx) not in chosen_data:
+				continue
+			position, orientation, up = str_to_arr(row["position"]), str_to_arr(row["orientation"]), str_to_arr(row["up"])
+			dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+			dep_em = np.load(os.path.join(em_base_path, f"EM-virtual-{proj_ident}-{em_idx}", f"{img_idx:06d}.npy"))
+			rgb_rc = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"), cv2.IMREAD_GRAYSCALE)
+			rgb_em = cv2.imread(os.path.join(em_base_path, f"EM-virtual-{proj_ident}-{em_idx}", f"{img_idx:06d}.png"), cv2.IMREAD_GRAYSCALE)
+			rgb_rc = rgb_rc[9 : 255, ...]
+			rgb_em = rgb_em / 255.0
+			rgb_rc = rgb_rc / 255.0
+
+			if show_fix:
+				rgb_gt, dep_gt = get_depth_map(p, position, orientation, up, get_outputs = True)
+				rgb_gt = cv2.cvtColor(rgb_gt, cv2.COLOR_RGBA2GRAY)
+				rgb_gt = rgb_gt / 255.0
+			
+			
+			"""
+			if show_fix:
+				out_dt = [(rgb_rc, "GSF-RC"), (rgb_em, "GSF-EM"), (rgb_gt, "GSF-GT"), (dep_rc, "DM-RC-SFS"), (dep_em, "DM-EM-Mesh"), (dep_gt, "DM-GT-Mesh")]
+				num_plots = 2, 3
+			else:
+				out_dt = [(rgb_rc, "GSF-RC"), (rgb_em, "GSF-EM"), (dep_rc, "DM-RC-SFS"), (dep_em, "DM-EM-Mesh")]
+				num_plots = 2, 2
+			
+			"""
+			out_dt = [(rgb_rc, "GSF-RC"), (rgb_em, "GSF-VC-EM")]
+			num_plots = 1, 2
+			
+
+			for i, (out_img, out_title) in enumerate(out_dt):
+				plt.subplot(*num_plots, i + 1)
+				if out_title.find("DM") != -1:
+					plt.imshow(out_img)
+				else:
+					plt.imshow(out_img, cmap = "gray", vmin = 0, vmax = 1)
+				if uses_colorbar:
+					plt.colorbar()
+				plt.axis("off")
+				plt.title(out_title, fontsize = 20, y = -0.15)
+			#plt.suptitle(f"REAL-{em_idx}-{img_idx}, {human_eval}", y = 0.05)
+
+			#plt.suptitle(f"REAL-{em_idx}, Frame-{img_idx}")
+			#plt.show()
+			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
+
+
+
 if __name__ == '__main__':
 	#plt.figure(figsize = (20, 15))
 	#write_sim_list()
@@ -618,9 +740,11 @@ if __name__ == '__main__':
 	draw_interp_outputs(2, 4)
 	"""
 
+	"""
 	manually_select_alignment_interp(0, 4)
 	manually_select_alignment_interp(1, 4)
 	manually_select_alignment_interp(2, 4)
+	"""
 
 	"""
 	manually_select_alignment_contour(0, 0)
@@ -634,3 +758,5 @@ if __name__ == '__main__':
 	#draw_contour_outputs(2, 0)
 
 	#plot_sim_scatter()
+	#plot_final_fixes(True)
+	plot_out_img(proj = False, show_fix = False)
