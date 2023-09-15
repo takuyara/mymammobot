@@ -16,6 +16,9 @@ from models.model_utils import get_mlp
 import warnings
 warnings.filterwarnings("ignore")
 
+hidden_args = ["base_path", "val_path", "num_workers", "device", "n_channels", "epochs", "save_path", "binary", "cap", "target_size", "four_fold", "four_thres",
+	"uses_sigmoid", "uses_bn", "reg_dims", "mlp_in_features", "inject_dropout", "normalise", "bins", "dark_thres", "sigmoid_scale", "pool_input_size", "pool_channels"]
+
 def get_args():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--base-path", type = str, default = "./")
@@ -25,16 +28,16 @@ def get_args():
 	parser.add_argument("--device", type = str, default = "cuda")
 	parser.add_argument("--n-channels", type = int, default = 1)
 	parser.add_argument("--num-classes", type = int, default = 3)
-	parser.add_argument("--epochs", type = int, default = 30)
+	parser.add_argument("--epochs", type = int, default = 20)
 	parser.add_argument("--batch-size", type = int, default = 32)
 	parser.add_argument("--lr", type = float, default = 1e-4)
 	parser.add_argument("--save-path", type = str, default = "./checkpoints")
-	parser.add_argument("--model-type", type = str, default = "resnet50")
-	parser.add_argument("--dropout", type = float, default = 0.4)
+	parser.add_argument("--model-type", type = str, default = "resnet101")
+	parser.add_argument("--dropout", type = float, default = 0.2)
 	parser.add_argument("--binary", action = "store_true", default = False)
 	parser.add_argument("--cap", type = float, default = 100)
 	parser.add_argument("--target-size", type = int, default = 150)
-	parser.add_argument("--aug", action = "store_true")
+	parser.add_argument("--aug", action = "store_true", default = True)
 	parser.add_argument("--four-fold", action = "store_true", default = False)
 	parser.add_argument("--four-thres", type = float, default = 0.4)
 	parser.add_argument("--uses-bn", action = "store_true", default = False)
@@ -44,8 +47,8 @@ def get_args():
 	parser.add_argument("--mlp-in-features", type = int, default = 2048)
 	parser.add_argument("--inject-dropout", action = "store_true", default = False)
 	parser.add_argument("--normalise", action = "store_true", default = False)
-	parser.add_argument("--cls-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
-	parser.add_argument("--reg-neurons", type = int, nargs = "+", default = [2048, 4096, 4096])
+	parser.add_argument("--cls-neurons", type = int, nargs = "+", default = [2048, 2048, 2048])
+	parser.add_argument("--reg-neurons", type = int, nargs = "+", default = [2048, 2048, 2048])
 	parser.add_argument("--amsgrad", action = "store_true", default = False)
 	parser.add_argument("--step-lr-size", type = int, default = 200)
 	parser.add_argument("--bins", type = int, default = 0)
@@ -53,7 +56,7 @@ def get_args():
 	parser.add_argument("--dark-thres", type = float, default = 0.4)
 	parser.add_argument("--sigmoid-scale", type = float, default = 12.5)
 	parser.add_argument("--pool-input-size", type = int, default = 5)
-	parser.add_argument("--pre-weight", type = float, default = None)
+	parser.add_argument("--pre-weight", type = float, default = 5)
 	parser.add_argument("--pool-channels", type = int, default = 2048)
 	parser.add_argument("--resume", type = str, default = None)
 	parser.add_argument("--adv-scale", type = float, default = 0)
@@ -272,7 +275,10 @@ def get_model(args):
 
 def main():
 	args = get_args()
-	print(args)
+	for arg_name, arg_value in vars(args).items():
+		if arg_name not in hidden_args:
+			print(f"{arg_name}: {arg_value}")
+
 	if args.four_fold:
 		args.num_classes = 4
 	train_set = PreloadDataset(os.path.join(args.base_path, f"{args.train_path}_img.npy"), os.path.join(args.base_path, f"{args.train_path}_label.npy"), get_transform(True, args), args)

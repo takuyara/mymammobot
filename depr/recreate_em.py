@@ -7,8 +7,8 @@ from tqdm import tqdm
 import cv2
 import argparse
 
-from utils.camera_motion import camera_params
-from utils.cl_geometry import project_to_cl, load_all_cls
+from ds_gen.camera_features import camera_params
+from utils.cl_utils import project_to_cl, load_all_cls
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -27,7 +27,7 @@ def main():
 	p = pv.Plotter(off_screen = True, window_size = (args.window_size, args.window_size))
 	p.add_mesh(surface)
 	camera = pv.Camera()
-	img_path = os.path.join(args.em_base_path, f"EM-virtual-{args.em_idx}")
+	img_path = os.path.join(args.em_base_path, f"EM-virtual-PROJ-{args.em_idx}")
 	em_path = os.path.join(args.em_base_path, f"EM-{args.em_idx}")
 	os.makedirs(img_path, exist_ok = True)
 	all_cls = load_all_cls(args.cl_base_path)
@@ -39,7 +39,8 @@ def main():
 		if args.proj2cl:
 			translation = project_to_cl(translation, all_cls)
 		orientation = R.from_quat(quaternion).apply(camera_params["forward_direction"])
-		up = R.from_quat(quaternion).apply(camera_params["up_direction"])
+		#up = R.from_quat(quaternion).apply(camera_params["up_direction"])
+		up = R.from_quat(quaternion).apply(np.array([-1, 0, 0]))
 		orientation = orientation / np.linalg.norm(orientation)
 		up = up / np.linalg.norm(up)
 		camera.position = translation

@@ -169,3 +169,4 @@ virtual_dataset
 real_dataset
 slurm*.out
 *.npy
+slurm-new-outs

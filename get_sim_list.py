@@ -701,6 +701,33 @@ def plot_out_img(proj, show_fix):
 			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
 
 
+def sfs_distrib():
+	out_path = "./depth-images/sfs-info"
+	#out_path = "./depth-images/fix-noproj-GSFonly"
+	chosen_data = [(0, 630), (0, 636)]
+	os.makedirs(out_path, exist_ok = True)
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			plt.clf()
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			if human_eval != 1:
+				continue
+			dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+			#print(dep_rc.shape)
+			#rgb_rc = rgb_rc[9 : 255, ...]
+			#dep_rc = dep_rc[9 : 255, ...]
+			plt.subplot(1, 2, 1)
+			plt.imshow(dep_rc)
+			plt.colorbar()
+			plt.subplot(1, 2, 2)
+			plt.hist(dep_rc.ravel(), bins = 20)
+			plt.suptitle(f"REAL-{em_idx}-{img_idx}, {human_eval}")
+			#plt.suptitle(f"REAL-{em_idx}, Frame-{img_idx}")
+			#plt.show()
+			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
+
+
 
 if __name__ == '__main__':
 	#plt.figure(figsize = (20, 15))
@@ -759,4 +786,5 @@ if __name__ == '__main__':
 
 	#plot_sim_scatter()
 	#plot_final_fixes(True)
-	plot_out_img(proj = False, show_fix = False)
+	#plot_out_img(proj = False, show_fix = False)
+	sfs_distrib()
