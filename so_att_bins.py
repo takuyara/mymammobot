@@ -63,6 +63,7 @@ def get_args():
 	parser.add_argument("--adv-scale", type = float, default = 0)
 	parser.add_argument("--dark-hist-rate", type = float, default = 0.2)
 	parser.add_argument("--border-padding", type = int, default = 0)
+	parser.add_argument("--relative-values", action = "store_true")
 	return parser.parse_args()
 
 
@@ -159,11 +160,23 @@ class WeightedAvgPool(nn.Module):
 	def __init__(self, args):
 		super(WeightedAvgPool, self).__init__()
 		self.avgpool = nn.AdaptiveAvgPool2d(1)
+		self.relative_values = args.relative_values
 	def forward(self, x, w):
 		#print("Valued Mask avg", w.mean().item())
 		#print("Prev mean", x.mean().item())
 		#x = self.dropout(x * w)
+		#print(x.min(), w.min())
+		#print("W range: ", w.min(), w.max(), w.mean())
+		#assert x.min() >= 0
+		#assert w.min() >= 0
+
+
 		x = x.view(x.size(0), -1, w.size(2), w.size(3))
+		if self.relative_values:
+			#assert torch.sum(x, dim = (1, 2, 3)).min() > 0
+			#print(torch.sum(x, dim = (1, 2, 3)).min())
+			x = x / (torch.sum(x, dim = (1, 2, 3), keepdim = True) + 1e-10)
+			w = w / torch.sum(w, dim = (1, 2, 3), keepdim = True)
 		#print(x.shape, w.shape)
 		x = x * w
 		#print("Weighted mean", x.mean().item())
@@ -233,11 +246,14 @@ class ClsRegModel(nn.Module):
 			hv = hv.view(-1, 1, 1, 1)
 
 		w_lg = F.sigmoid((x1 - hv) * self.sgm_scale)
+		totally_white = torch.ones_like(x1)
 		#print("Before feeding into module: ", w_lg.min(), w_lg.max())
 		with torch.no_grad():
 			w_sm = self.mask_extractor(w_lg)
+			totally_white = self.mask_extractor(totally_white)
 		#print(w_sm.shape)
 		w_sm = w_sm.view(w_sm.size(0), 1, self.pool_input_size, self.pool_input_size)
+		totally_white = totally_white.view(totally_white.size(0), 1, self.pool_input_size, self.pool_input_size)
 		#print(w_sm.shape, w_sm.mean().item(), w_sm.min().item(), w_sm.max().item())
 		#w_sm_wr = F.avg_pool2d(w_lg, self.pool_kernel)
 
@@ -245,22 +261,27 @@ class ClsRegModel(nn.Module):
 		#print(mins.shape, maxes.shape)
 		#print(mins, maxes)
 		w_sm = (w_sm - mins) / (maxes - mins)
+		w_sm_before = w_sm
+		w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
 
+		
+		#for _x1, _w_sm, _w_sm_wr in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(w_sm_wr)):
 		"""
-		for _x1, _w_sm, _w_sm_wr in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(w_sm_wr)):
-			plt.subplot(1, 3, 1)
+		for _x1, _w_sm, _w_sm_wr, _w_lg in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(totally_white), torch.unbind(w_lg)):
+			plt.subplot(1, 4, 1)
 			plt.imshow(_x1.detach().cpu().numpy().squeeze())
-			plt.subplot(1, 3, 2)
+			plt.subplot(1, 4, 2)
 			plt.imshow(_w_sm.detach().cpu().numpy().squeeze())
-			plt.subplot(1, 3, 3)
+			plt.subplot(1, 4, 3)
 			plt.imshow(_w_sm_wr.detach().cpu().numpy().squeeze())
+			plt.subplot(1, 4, 4)
+			plt.imshow(_w_lg.detach().cpu().numpy().squeeze())
 			plt.show()
-			print(_w_sm.min().item(), _w_sm.max().item())
+			#print(_w_sm.min().item(), _w_sm.max().item())
 		"""
-
 		#w_sm = w_sm - 
 
-		w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
+
 
 		x = self.base(x)
 		#print("Forward: ", x.shape)

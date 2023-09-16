@@ -14,7 +14,7 @@ from multiprocessing import Pool
 from ds_gen.camera_features import camera_params
 from utils.cl_utils import project_to_cl, load_all_cls, in_mesh_bounds, get_cl_direction
 from utils.geometry import random_points_in_sphere, arbitrary_perpendicular_vector, rotate_single_vector, rotate_all_degrees, get_vector_angle, random_perpendicular_offsets
-from pose_fixing.similarity import comb_corr_sim, reg_mse_sim
+from pose_fixing.similarity import comb_corr_sim, reg_mse_sim, mi_sim, corr_sim
 from ds_gen.depth_map_generation import get_depth_map
 from pose_fixing.move_camera import randomise_params
 from utils.stats import weighted_corr
@@ -146,17 +146,20 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 	old_up = np.array([-0.17030983, 0.58201775, -0.79514143])
 	"""
 
+	"""
+	Best
 	new_position = np.array([-35.23436981, -26.07758012, -161.09738046])
 	new_orientation = np.array([-0.86110491, -0.40747873, -0.30407139])
 	new_up = np.array([0.50811759, -0.71058364, -0.4867108])
+	"""
 	
 
-	"""
-	Iter 1
-	t_position = np.array([-33.013039, -27.23421861, -162.06400843])
-	t_orientation = np.array([-0.91553654, -0.17466719, -0.36233164])
-	desired_up = np.array([0.34834557, -0.79469893, -0.49710057])
-	"""
+	
+	#Iter 1
+	new_position = np.array([-33.013039, -27.23421861, -162.06400843])
+	new_orientation = np.array([-0.91553654, -0.17466719, -0.36233164])
+	new_up = np.array([0.34834557, -0.79469893, -0.49710057])
+	
 
 	
 	#Iter 2
@@ -363,10 +366,11 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 
 
 
-	print("Old sim (corr, log): ", comb_corr_sim(real_depth_map, old_dep), log_error(real_depth_map, old_dep))
+	print("Old sim (corr, log): ", corr_sim(real_depth_map, old_dep), comb_corr_sim(real_depth_map, old_dep), mi_sim(real_depth_map, old_dep, num_bins = 30), log_error(real_depth_map, old_dep))
 	old_iou, old_hd, contours_img_r_old, contours_img_v_old = analysis_corr(real_depth_map, old_dep)
-	print("New sim (corr, log): ", comb_corr_sim(real_depth_map, new_dep), log_error(real_depth_map, new_dep))
+	print("New sim (corr, log): ", corr_sim(real_depth_map, new_dep), comb_corr_sim(real_depth_map, new_dep), mi_sim(real_depth_map, new_dep, num_bins = 30), log_error(real_depth_map, new_dep))
 	new_iou, new_hd, contours_img_r_new, contours_img_v_new = analysis_corr(real_depth_map, new_dep)
+
 
 	"""
 	for fl in [20, 50, 100, 200, 300]:
