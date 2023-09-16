@@ -12,12 +12,13 @@ from sklearn.metrics import accuracy_score, f1_score
 import matplotlib.pyplot as plt
 from utils.misc import randu_gen
 from models.model_utils import get_mlp
+from torchvision.models.resnet import Bottleneck
 
 import warnings
 warnings.filterwarnings("ignore")
 
 hidden_args = ["base_path", "val_path", "num_workers", "device", "n_channels", "epochs", "save_path", "binary", "cap", "target_size", "four_fold", "four_thres",
-	"uses_sigmoid", "uses_bn", "reg_dims", "mlp_in_features", "inject_dropout", "normalise", "bins", "dark_thres", "sigmoid_scale", "pool_input_size", "pool_channels"]
+	"uses_sigmoid", "uses_bn", "reg_dims", "mlp_in_features", "inject_dropout", "normalise", "bins", "dark_thres", "sigmoid_scale", "pool_input_size", "pool_channels", "num_classes", "aug"]
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -175,7 +176,7 @@ class PlaceHolder(nn.Module):
 		return x
 
 class ClsRegModel(nn.Module):
-	def __init__(self, base, args):
+	def __init__(self, base, mask_extractor, args):
 		super(ClsRegModel, self).__init__()
 		if args.pre_weight is not None:
 			bb = np.log(args.pre_weight - 1) if args.pre_weight > 1 else 1e-10
@@ -186,6 +187,7 @@ class ClsRegModel(nn.Module):
 		self.sgm_loc, self.sgm_scale = args.dark_thres, args.sigmoid_scale
 		self.pool_kernel = args.target_size // args.pool_input_size
 		self.adv_scale = args.adv_scale
+		self.pool_input_size = args.pool_input_size
 
 		self.dark_thres = args.dark_thres
 		self.base = base
@@ -204,6 +206,9 @@ class ClsRegModel(nn.Module):
 		base.avgpool = nn.Identity()
 		base.fc = nn.Identity()
 		self.base = base
+		mask_extractor.avgpool = nn.Identity()
+		mask_extractor.fc = nn.Identity()
+		self.mask_extractor = mask_extractor
 		if args.cls_neurons != [0]:
 			self.mlp_cls, cls_final_dim = get_mlp(args.mlp_in_features, args.cls_neurons, args.dropout)
 		else:
@@ -224,7 +229,24 @@ class ClsRegModel(nn.Module):
 			hv = hv.view(-1, 1, 1, 1)
 
 		w_lg = F.sigmoid((x1 - hv) * self.sgm_scale)
-		w_sm = F.avg_pool2d(w_lg, self.pool_kernel)
+		#print("Before feeding into module: ", w_lg.min(), w_lg.max())
+		with torch.no_grad():
+			w_sm = self.mask_extractor(w_lg)
+		w_sm = w_sm.view(w_sm.size(0), 1, self.pool_input_size, self.pool_input_size)
+		#print(w_sm.shape, w_sm.mean(), w_sm.min(), w_sm.max())
+		#w_sm_wr = F.avg_pool2d(w_lg, self.pool_kernel)
+
+		"""
+		for _x1, _w_sm, _w_sm_wr in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(w_sm_wr)):
+			plt.subplot(1, 3, 1)
+			plt.imshow(_x1.detach().cpu().numpy().reshape(150, 150))
+			plt.subplot(1, 3, 2)
+			plt.imshow(_w_sm.detach().cpu().numpy().reshape(5, 5))
+			plt.subplot(1, 3, 3)
+			plt.imshow(_w_sm_wr.detach().cpu().numpy().reshape(5, 5))
+			plt.show()
+		"""
+
 		w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
 
 		x = self.base(x)
@@ -247,6 +269,36 @@ def append_dropout(model, dropout):
 			new_module = nn.Sequential(module, nn.Dropout2d(dropout))
 			setattr(model, name, new_module)
 
+class HalfingLayer(nn.Module):
+	def __init__(self):
+		super(HalfingLayer, self).__init__()
+	def forward(self, x):
+		return x / 2
+
+def change_n_channels(model):
+	for name, module in model.named_children():
+		if len(list(module.children())) > 0:
+			change_n_channels(module)
+		if isinstance(module, nn.Conv2d):
+			#print("Changed to new model")
+			kernel_size = module.kernel_size
+			sum_field = kernel_size[0] * kernel_size[1]
+			new_module = nn.Conv2d(1, 1, kernel_size = kernel_size, stride = module.stride, padding = module.padding, groups = module.groups, bias = False, dilation = module.dilation)
+			new_module.weight = nn.Parameter(torch.ones_like(new_module.weight) / sum_field, requires_grad = False)
+			#print(new_module.weight)
+			setattr(model, name, new_module)
+		elif isinstance(module, nn.BatchNorm2d):
+			new_module = nn.Identity()
+			setattr(model, name, new_module)
+		elif isinstance(module, Bottleneck):
+			new_module = nn.Sequential(module, HalfingLayer())
+			setattr(model, name, new_module)
+
+def net_to_receptive_extractor(model):
+	model = deepcopy(model)
+	change_n_channels(model)
+	return model
+
 def get_model(args):
 	if args.model_type.find("resnet") != -1:
 		if args.model_type == "resnet34":
@@ -266,12 +318,15 @@ def get_model(args):
 			model.conv1 = nn.Conv2d(args.n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
 		if args.inject_dropout:
 			append_dropout(model, args.dropout)
-			print(model)
+			#print(model)
 	else:
 		model = models.swin_v2_t(weights = models.Swin_V2_T_Weights.DEFAULT, dropout = args.dropout)
 		if args.n_channels != 3:
 			model.features[0][0] = nn.Conv2d(args.n_channels, 96, kernel_size = 4, stride = 4)
-	return ClsRegModel(model, args)
+	mask_extractor = net_to_receptive_extractor(model)
+	#print(mask_extractor)
+
+	return ClsRegModel(model, mask_extractor, args)
 
 def main():
 	args = get_args()
@@ -289,6 +344,7 @@ def main():
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	model = get_model(args)
 	model = model.to(args.device)
+
 	if args.resume is not None:
 		print("Resuming from ", args.resume, flush = True)
 		model.load_state_dict(torch.load(os.path.join(args.save_path, args.resume)))

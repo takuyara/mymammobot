@@ -309,12 +309,13 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 		light_contours_r, __ = cv2.findContours(light_mask_r.reshape(*prev_shape), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 		light_contours_v, __ = cv2.findContours(light_mask_v.reshape(*prev_shape), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
+		contours_img_r = cv2.drawContours(cv2.cvtColor(light_mask_r.reshape(*prev_shape), cv2.COLOR_GRAY2BGR), light_contours_r, -1, (0, 255, 0), 3)
+		contours_img_v = cv2.drawContours(cv2.cvtColor(light_mask_v.reshape(*prev_shape), cv2.COLOR_GRAY2BGR), light_contours_v, -1, (0, 255, 0), 3)
+
 		"""
 		print(light_contours_r.shape, light_contours_v.shape)
 		print(len(light_contours_r), len(light_contours_v))
 
-		contours_img_r = cv2.drawContours(cv2.cvtColor(light_mask_r.reshape(*prev_shape), cv2.COLOR_GRAY2BGR), light_contours_r, -1, (0, 255, 0), 3)
-		contours_img_v = cv2.drawContours(cv2.cvtColor(light_mask_v.reshape(*prev_shape), cv2.COLOR_GRAY2BGR), light_contours_v, -1, (0, 255, 0), 3)
 
 		plt.subplot(1, 2, 1)
 		plt.imshow(contours_img_r)
@@ -338,7 +339,7 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 
 		iou_value = np.sum(np.logical_and(rd1 > r_thres, vd1 > v_thres)) / np.sum(np.logical_or(rd1 > r_thres, vd1 > v_thres))
 		#return iou.reshape(*prev_shape)
-		return iou_value, hausdorff_dist
+		return iou_value, hausdorff_dist, contours_img_r, contours_img_v
 
 		#print(f"Confirmed corr {(np.sum(err * w) / np.sum(w)):.4f}")
 
@@ -363,9 +364,9 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 
 
 	print("Old sim (corr, log): ", comb_corr_sim(real_depth_map, old_dep), log_error(real_depth_map, old_dep))
-	old_iou, old_hd = analysis_corr(real_depth_map, old_dep)
+	old_iou, old_hd, contours_img_r_old, contours_img_v_old = analysis_corr(real_depth_map, old_dep)
 	print("New sim (corr, log): ", comb_corr_sim(real_depth_map, new_dep), log_error(real_depth_map, new_dep))
-	new_iou, new_hd = analysis_corr(real_depth_map, new_dep)
+	new_iou, new_hd, contours_img_r_new, contours_img_v_new = analysis_corr(real_depth_map, new_dep)
 
 	"""
 	for fl in [20, 50, 100, 200, 300]:

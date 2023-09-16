@@ -662,6 +662,7 @@ def plot_out_img(proj, show_fix):
 			rgb_rc = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"), cv2.IMREAD_GRAYSCALE)
 			rgb_em = cv2.imread(os.path.join(em_base_path, f"EM-virtual-{proj_ident}-{em_idx}", f"{img_idx:06d}.png"), cv2.IMREAD_GRAYSCALE)
 			rgb_rc = rgb_rc[9 : 255, ...]
+			rgb_rc = cv2.resize(rgb_rc, (224, 224))
 			rgb_em = rgb_em / 255.0
 			rgb_rc = rgb_rc / 255.0
 
@@ -728,6 +729,99 @@ def sfs_distrib():
 			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
 
 
+def sfs_distrib_summ():
+	out_path = "./depth-images/sfs-info-summ"
+	os.makedirs(out_path, exist_ok = True)
+	all_ranges, all_means, all_peaks = [], [], []
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy")).ravel()
+			all_ranges.append(dep_rc.max() - dep_rc.min())
+			all_means.append(dep_rc.mean())
+			hst, __ = np.histogram(dep_rc, bins = 30)
+			all_peaks.append(np.argmax(hst) + 1)
+
+	np.save("all_ranges.npy", all_ranges)
+	np.save("all_means", all_means)
+	np.save("all_peaks", all_peaks)
+
+	plt.figure(figsize = (12, 3.5))
+	plt.subplots_adjust(left = 0.01, right = 0.99, top = 0.9, bottom = 0.3, hspace = 0.05, wspace = 0.15)
+	#title_config = {"fontsize": 20, "y": -0.5}
+	xlabel_config = {"fontsize": 20, "y": 1}
+	ylabel_config = {"fontsize": 20}
+	plt.subplot(1, 3, 1)
+	plt.hist(all_ranges, bins = 30, density = True)
+	#plt.title("Range Distribution", **title_config)
+	plt.xlabel("DM-RC-SFS Range", **xlabel_config)
+	plt.ylabel("Density", **ylabel_config)
+	plt.subplot(1, 3, 2)
+	plt.hist(all_means, bins = 30, density = True)
+	#plt.title("Mean Distribution", **title_config)
+	plt.xlabel("DM-RC-SFS Mean", **xlabel_config)
+	plt.ylabel("Density", **ylabel_config)
+	plt.subplot(1, 3, 3)
+	plt.hist(all_peaks, bins = 30, range = (0, 30), density = True)
+	#plt.title("Bin Peak Distribution", **title_config)
+	plt.xlabel("Peak Bin of Histogram", **xlabel_config)
+	plt.ylabel("Density", **ylabel_config)
+	#plt.show()
+	print(np.sum(np.array(all_peaks) <= 3) / len(all_peaks))
+
+
+def plot_sfs_out_img():
+	chosen_data = [(0, 36, 6.82), (0, 630, 5.29), (0, 636, 4.86)]
+	out_path = "./depth-images/final-sfs-selected"
+	os.makedirs(out_path, exist_ok = True)
+
+	plt.figure(figsize = (12, 3.5))
+	plt.subplots_adjust(left = 0.01, right = 0.99, top = 0.9, bottom = 0.3, hspace = 0.05, wspace = 0.15)
+	title_config = {"fontsize": 20, "y": -0.5}
+
+	for em_idx, img_idx, bir_thres in chosen_data:
+		dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+		rgb_rc = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"), cv2.IMREAD_GRAYSCALE)
+		rgb_rc = rgb_rc[9 : 255, ...]
+		rgb_rc = cv2.resize(rgb_rc, (224, 224))
+		rgb_rc = rgb_rc / 255.0
+		#print(rgb_rc.shape, dep_rc.shape)
+		#print(dep_rc.min(), dep_rc.max())
+		
+		
+		plt.subplot(1, 3, 1)
+		plt.imshow(rgb_rc, cmap = "gray", vmin = 0, vmax = 1)
+		plt.title("GSF-RC", **title_config)
+		plt.axis("off")
+		plt.subplot(1, 3, 2)
+		plt.imshow(dep_rc, vmin = 2.5, vmax = 8)
+		plt.title("DM-RC-SFS", **title_config)
+		plt.colorbar()
+		plt.axis("off")
+		plt.subplot(1, 3, 3)
+		plt.hist(dep_rc.ravel(), bins = 30, density = True, range = (2.5, 8))
+		plt.title("DM Histogram", **title_config)
+		plt.xlabel("Depth Value", fontsize = 15, y = 1)
+		plt.ylabel("Density", fontsize = 15)
+		plt.ylim(0, 1.0)
+		
+		plt.show()
+
+		hst, bin_edges = np.histogram(dep_rc.ravel(), bins = 30, density = True)
+		for i, x in enumerate(bin_edges):
+			if bir_thres <= x:
+				bir_idx = i - 1
+				break
+		print(np.max(hst[bir_idx : ]) / np.max(hst))
+		print(np.sum(dep_rc >= bir_thres) / len(dep_rc.ravel()))
+		plt.imshow(dep_rc >= bir_thres)
+		plt.show()
+
+		#plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
+		#plt.clf()
+
+
 
 if __name__ == '__main__':
 	#plt.figure(figsize = (20, 15))
@@ -787,4 +881,6 @@ if __name__ == '__main__':
 	#plot_sim_scatter()
 	#plot_final_fixes(True)
 	#plot_out_img(proj = False, show_fix = False)
-	sfs_distrib()
+	#sfs_distrib()
+	plot_sfs_out_img()
+	#sfs_distrib_summ()
