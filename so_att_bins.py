@@ -62,6 +62,7 @@ def get_args():
 	parser.add_argument("--resume", type = str, default = None)
 	parser.add_argument("--adv-scale", type = float, default = 0)
 	parser.add_argument("--dark-hist-rate", type = float, default = 0.2)
+	parser.add_argument("--border-padding", type = int, default = 0)
 	return parser.parse_args()
 
 
@@ -91,6 +92,7 @@ def get_transform(training, args):
 		else:
 			img = resize(img)
 		img = (img - img.min()) / (img.max() - img.min())
+		img = transforms.functional.pad(img, args.border_padding)
 		if args.bins > 0:
 			print("Using histogram to reduce noise.")
 			img = torch.minimum(torch.floor(img * args.bins), torch.tensor(args.bins - 1)) / args.bins
@@ -159,10 +161,10 @@ class WeightedAvgPool(nn.Module):
 		self.avgpool = nn.AdaptiveAvgPool2d(1)
 	def forward(self, x, w):
 		#print("Valued Mask avg", w.mean().item())
-		#print(x.shape, w.shape)
 		#print("Prev mean", x.mean().item())
 		#x = self.dropout(x * w)
 		x = x.view(x.size(0), -1, w.size(2), w.size(3))
+		#print(x.shape, w.shape)
 		x = x * w
 		#print("Weighted mean", x.mean().item())
 		x = self.avgpool(x)
@@ -188,6 +190,8 @@ class ClsRegModel(nn.Module):
 		self.pool_kernel = args.target_size // args.pool_input_size
 		self.adv_scale = args.adv_scale
 		self.pool_input_size = args.pool_input_size
+		self.target_size = args.target_size
+		self.border_padding = args.border_padding
 
 		self.dark_thres = args.dark_thres
 		self.base = base
@@ -232,20 +236,29 @@ class ClsRegModel(nn.Module):
 		#print("Before feeding into module: ", w_lg.min(), w_lg.max())
 		with torch.no_grad():
 			w_sm = self.mask_extractor(w_lg)
+		#print(w_sm.shape)
 		w_sm = w_sm.view(w_sm.size(0), 1, self.pool_input_size, self.pool_input_size)
-		#print(w_sm.shape, w_sm.mean(), w_sm.min(), w_sm.max())
+		#print(w_sm.shape, w_sm.mean().item(), w_sm.min().item(), w_sm.max().item())
 		#w_sm_wr = F.avg_pool2d(w_lg, self.pool_kernel)
+
+		mins, maxes = w_sm.min(-1, keepdim = True)[0].min(-2, keepdim = True)[0], w_sm.max(-1, keepdim = True)[0].max(-2, keepdim = True)[0]
+		#print(mins.shape, maxes.shape)
+		#print(mins, maxes)
+		w_sm = (w_sm - mins) / (maxes - mins)
 
 		"""
 		for _x1, _w_sm, _w_sm_wr in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(w_sm_wr)):
 			plt.subplot(1, 3, 1)
-			plt.imshow(_x1.detach().cpu().numpy().reshape(150, 150))
+			plt.imshow(_x1.detach().cpu().numpy().squeeze())
 			plt.subplot(1, 3, 2)
-			plt.imshow(_w_sm.detach().cpu().numpy().reshape(5, 5))
+			plt.imshow(_w_sm.detach().cpu().numpy().squeeze())
 			plt.subplot(1, 3, 3)
-			plt.imshow(_w_sm_wr.detach().cpu().numpy().reshape(5, 5))
+			plt.imshow(_w_sm_wr.detach().cpu().numpy().squeeze())
 			plt.show()
+			print(_w_sm.min().item(), _w_sm.max().item())
 		"""
+
+		#w_sm = w_sm - 
 
 		w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
 
@@ -286,6 +299,7 @@ def change_n_channels(model):
 			new_module = nn.Conv2d(1, 1, kernel_size = kernel_size, stride = module.stride, padding = module.padding, groups = module.groups, bias = False, dilation = module.dilation)
 			new_module.weight = nn.Parameter(torch.ones_like(new_module.weight) / sum_field, requires_grad = False)
 			#print(new_module.weight)
+			#print(new_module.padding)
 			setattr(model, name, new_module)
 		elif isinstance(module, nn.BatchNorm2d):
 			new_module = nn.Identity()
@@ -363,6 +377,7 @@ def main():
 			coord_trues, coord_preds = [], []
 			sum_loss = num_loss = 0
 			for imgs, labels, coords in loader:
+				#print("Batch")
 				imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
 				with torch.set_grad_enabled(phase == "train"):
 					logits, pred_coords = model(imgs)
