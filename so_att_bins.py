@@ -172,13 +172,7 @@ class WeightedAvgPool(nn.Module):
 
 
 		x = x.view(x.size(0), -1, w.size(2), w.size(3))
-		if self.relative_values:
-			#assert torch.sum(x, dim = (1, 2, 3)).min() > 0
-			#print(torch.sum(x, dim = (1, 2, 3)).min())
-			#x = x / (torch.sum(x, dim = (1, 2, 3), keepdim = True) + 1e-10)
-			x1 = torch.exp(x)
-			x = x1 / torch.sum(x1, dim = (1, 2, 3), keepdim = True)
-			w = w / torch.sum(w, dim = (1, 2, 3), keepdim = True)
+		w = w / torch.sum(w, dim = (1, 2, 3), keepdim = True)
 		#print(x.shape, w.shape)
 		x = x * w
 		#print("Weighted mean", x.mean().item())

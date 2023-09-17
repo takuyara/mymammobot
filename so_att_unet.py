@@ -66,6 +66,7 @@ def get_args():
 	parser.add_argument("--relative-values", action = "store_true")
 	parser.add_argument("--out-feature-dim", type = int, default = 128)
 	parser.add_argument("--base-channels", type = int, default = 4)
+	parser.add_argument("--do-rescale", action = "store_true")
 	return parser.parse_args()
 
 
@@ -136,11 +137,12 @@ class PreloadDataset(Dataset):
 		return len(self.img_data)
 
 class Rescaler(nn.Module):
-	def __init__(self, bins, dropout, height_rate):
+	def __init__(self, bins, dropout, height_rate, do_rescale):
 		super(Rescaler, self).__init__()
 		self.mlp = get_mlp(bins, [32, 64, 128, 1], dropout)[0]
 		self.bins = bins
 		self.height_rate = height_rate
+		self.do_rescale = do_rescale
 	def forward(self, x):
 		hst = []
 		value = []
@@ -154,9 +156,12 @@ class Rescaler(nn.Module):
 			value.append(t_value)
 		hst = torch.stack(hst, dim = 0).detach()
 		value = torch.stack(value, dim = 0).detach()
-		w = self.mlp(hst).unsqueeze(-1).unsqueeze(-1)
-		out = x * w
-		return out, value
+		if self.do_rescale:
+			w = self.mlp(hst).unsqueeze(-1).unsqueeze(-1)
+			out = x * w
+			return out, value
+		else:
+			return x, value
 
 class WeightedAvgPool(nn.Module):
 	def __init__(self, args):
@@ -176,8 +181,8 @@ class WeightedAvgPool(nn.Module):
 		x = x.view(x.size(0), -1, w.size(2), w.size(3))
 		w = w / torch.sum(w, dim = (1, 2, 3), keepdim = True)
 		x = x * w
-		print("Shape before avgpool: ", x.shape)
-		x = self.avgpool(x)
+		#print("Shape before avgpool: ", x.shape)
+		#x = self.avgpool(x)
 		print("Shape after avgpool: ", x.shape)
 		return x
 
@@ -191,8 +196,29 @@ class PlaceHolder(nn.Module):
 def get_block(in_channels, out_channels, kernel_size = 3, padding = 1):
 	return nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size, padding = padding), nn.BatchNorm2d(out_channels), nn.LeakyReLU(0.2))
 
+class ConvDownsample(nn.Module):
+	def __init__(self, in_channels):
+		super(ConvDownsample, self).__init__()
+		self.b1 = nn.Sequential(get_block(in_channels, in_channels * 2), nn.AvgPool2d(2, 2))
+		self.b2 = nn.Sequential(get_block(in_channels * 2, in_channels * 4), nn.AvgPool2d(2, 2))
+		self.b3 = nn.Sequential(get_block(in_channels * 4, in_channels * 8), nn.AvgPool2d(2, 2))
+		self.b4 = nn.Sequential(get_block(in_channels * 8, in_channels * 16), nn.AvgPool2d(2, 2))
+		self.avgpool = nn.AdaptiveAvgPool2d(1)
+	def forward(self, x):
+		#print(x.shape)
+		x = self.b1(x)
+		#print(x.shape)
+		x = self.b2(x)
+		#print(x.shape)
+		x = self.b3(x)
+		#print(x.shape)
+		x = self.b4(x)
+		x = self.avgpool(x)
+		#print(x.shape)
+		return x
+
 class UNet2D(nn.Module):
-	def __init__(self, out_feature_dim = 128, d = 32):
+	def __init__(self, d = 32):
 		super(UNet2D, self).__init__()
 		self.down_layer_1 = nn.Sequential(get_block(1, d), get_block(d, d * 2))
 		self.down_layer_2 = nn.Sequential(nn.MaxPool2d(2, 2), get_block(d * 2, d * 2), get_block(d * 2, d * 4))
@@ -201,7 +227,8 @@ class UNet2D(nn.Module):
 		self.up_layer_1 = nn.Sequential(get_block(d * 8 + d * 16, d * 8), get_block(d * 8, d * 8), nn.ConvTranspose2d(d * 8, d * 8, 2, 2))
 		self.up_layer_2 = nn.Sequential(get_block(d * 4 + d * 8, d * 4), get_block(d * 4, d * 4), nn.ConvTranspose2d(d * 4, d * 4, 2, 2))
 		self.up_layer_3 = nn.Sequential(get_block(d * 2 + d * 4, d * 2), get_block(d * 2, d * 2))
-		self.out_conv = nn.Conv2d(d * 2, out_feature_dim, 1, padding = 0)
+		#self.out_conv = nn.Conv2d(d * 2, out_feature_dim, 1, padding = 0)
+		self.out_feature_dim = d * 2
 
 	def forward(self, x):
 		down_1_out = self.down_layer_1(x)
@@ -211,8 +238,7 @@ class UNet2D(nn.Module):
 		up_1_out = self.up_layer_1(torch.cat([down_3_out, down_up_out], dim = -3))
 		up_2_out = self.up_layer_2(torch.cat([down_2_out, up_1_out], dim = -3))
 		up_3_out = self.up_layer_3(torch.cat([down_1_out, up_2_out], dim = -3))
-		out = self.out_conv(up_3_out)
-		return out
+		return up_3_out
 
 class ClsRegModel(nn.Module):
 	def __init__(self, base, args):
@@ -238,12 +264,13 @@ class ClsRegModel(nn.Module):
 			self.batch_norm = None
 		if args.rescaler_bins > 0:
 			print("Using rescaler.")
-			self.rescaler = Rescaler(args.rescaler_bins, args.dropout, args.dark_hist_rate)
+			self.rescaler = Rescaler(args.rescaler_bins, args.dropout, args.dark_hist_rate, args.do_rescale)
 		else:
 			self.rescaler = None
 
 		self.base_pool = WeightedAvgPool(args)
-		self.base_fc = nn.Sequential(nn.Linear(args.out_feature_dim, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
+		self.down_conv = ConvDownsample(base.out_feature_dim)
+		self.base_fc = nn.Sequential(nn.Linear(base.out_feature_dim * 16, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
 		self.base = base
 		if args.cls_neurons != [0]:
 			self.mlp_cls, cls_final_dim = get_mlp(args.mlp_in_features, args.cls_neurons, args.dropout)
@@ -271,6 +298,7 @@ class ClsRegModel(nn.Module):
 		#print("Shape before base_pool call: ", x.shape)
 		x = self.base_pool(x, w_lg)
 		#print("Shape after base_pool call: ", x.shape)
+		x = self.down_conv(x)
 		#x = torch.mean(x, dim = (2, 3))
 		#print("Shape after meaning: ", x.shape)
 		x = x.squeeze()
@@ -283,7 +311,7 @@ class ClsRegModel(nn.Module):
 
 
 def get_model(args):
-	model = UNet2D(args.out_feature_dim, args.base_channels)	
+	model = UNet2D(args.base_channels)	
 	return ClsRegModel(model, args)
 
 def main():
@@ -303,7 +331,7 @@ def main():
 	model = get_model(args)
 	model = model.to(args.device)
 
-	print(model)
+	#print(model)
 
 	if args.resume is not None:
 		print("Resuming from ", args.resume, flush = True)
