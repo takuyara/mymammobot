@@ -64,6 +64,8 @@ def get_args():
 	parser.add_argument("--dark-hist-rate", type = float, default = 0.2)
 	parser.add_argument("--border-padding", type = int, default = 0)
 	parser.add_argument("--relative-values", action = "store_true")
+	parser.add_argument("--out-feature-dim", type = int, default = 128)
+	parser.add_argument("--base-channels", type = int, default = 4)
 	return parser.parse_args()
 
 
@@ -172,17 +174,11 @@ class WeightedAvgPool(nn.Module):
 
 
 		x = x.view(x.size(0), -1, w.size(2), w.size(3))
-		if self.relative_values:
-			#assert torch.sum(x, dim = (1, 2, 3)).min() > 0
-			#print(torch.sum(x, dim = (1, 2, 3)).min())
-			#x = x / (torch.sum(x, dim = (1, 2, 3), keepdim = True) + 1e-10)
-			x1 = torch.exp(x)
-			x = x1 / torch.sum(x1, dim = (1, 2, 3), keepdim = True)
-			w = w / torch.sum(w, dim = (1, 2, 3), keepdim = True)
-		#print(x.shape, w.shape)
+		w = w / torch.sum(w, dim = (1, 2, 3), keepdim = True)
 		x = x * w
-		#print("Weighted mean", x.mean().item())
+		print("Shape before avgpool: ", x.shape)
 		x = self.avgpool(x)
+		print("Shape after avgpool: ", x.shape)
 		return x
 
 class PlaceHolder(nn.Module):
@@ -192,8 +188,34 @@ class PlaceHolder(nn.Module):
 		print("Input Placeholder: ", x.shape)
 		return x
 
+def get_block(in_channels, out_channels, kernel_size = 3, padding = 1):
+	return nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel_size, padding = padding), nn.BatchNorm2d(out_channels), nn.LeakyReLU(0.2))
+
+class UNet2D(nn.Module):
+	def __init__(self, out_feature_dim = 128, d = 32):
+		super(UNet2D, self).__init__()
+		self.down_layer_1 = nn.Sequential(get_block(1, d), get_block(d, d * 2))
+		self.down_layer_2 = nn.Sequential(nn.MaxPool2d(2, 2), get_block(d * 2, d * 2), get_block(d * 2, d * 4))
+		self.down_layer_3 = nn.Sequential(nn.MaxPool2d(2, 2), get_block(d * 4, d * 4), get_block(d * 4, d * 8))
+		self.down_up_layer = nn.Sequential(nn.MaxPool2d(2, 2), get_block(d * 8, d * 8), get_block(d * 8, d * 16), nn.ConvTranspose2d(d * 16, d * 16, 2, 2))
+		self.up_layer_1 = nn.Sequential(get_block(d * 8 + d * 16, d * 8), get_block(d * 8, d * 8), nn.ConvTranspose2d(d * 8, d * 8, 2, 2))
+		self.up_layer_2 = nn.Sequential(get_block(d * 4 + d * 8, d * 4), get_block(d * 4, d * 4), nn.ConvTranspose2d(d * 4, d * 4, 2, 2))
+		self.up_layer_3 = nn.Sequential(get_block(d * 2 + d * 4, d * 2), get_block(d * 2, d * 2))
+		self.out_conv = nn.Conv2d(d * 2, out_feature_dim, 1, padding = 0)
+
+	def forward(self, x):
+		down_1_out = self.down_layer_1(x)
+		down_2_out = self.down_layer_2(down_1_out)
+		down_3_out = self.down_layer_3(down_2_out)
+		down_up_out = self.down_up_layer(down_3_out)
+		up_1_out = self.up_layer_1(torch.cat([down_3_out, down_up_out], dim = -3))
+		up_2_out = self.up_layer_2(torch.cat([down_2_out, up_1_out], dim = -3))
+		up_3_out = self.up_layer_3(torch.cat([down_1_out, up_2_out], dim = -3))
+		out = self.out_conv(up_3_out)
+		return out
+
 class ClsRegModel(nn.Module):
-	def __init__(self, base, mask_extractor, args):
+	def __init__(self, base, args):
 		super(ClsRegModel, self).__init__()
 		if args.pre_weight is not None:
 			bb = np.log(args.pre_weight - 1) if args.pre_weight > 1 else 1e-10
@@ -221,13 +243,8 @@ class ClsRegModel(nn.Module):
 			self.rescaler = None
 
 		self.base_pool = WeightedAvgPool(args)
-		self.base_fc = nn.Sequential(nn.Linear(base.fc.in_features, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
-		base.avgpool = nn.Identity()
-		base.fc = nn.Identity()
+		self.base_fc = nn.Sequential(nn.Linear(args.out_feature_dim, args.mlp_in_features), nn.Dropout(args.dropout), nn.LeakyReLU(0.2))
 		self.base = base
-		mask_extractor.avgpool = nn.Identity()
-		mask_extractor.fc = nn.Identity()
-		self.mask_extractor = mask_extractor
 		if args.cls_neurons != [0]:
 			self.mlp_cls, cls_final_dim = get_mlp(args.mlp_in_features, args.cls_neurons, args.dropout)
 		else:
@@ -248,50 +265,15 @@ class ClsRegModel(nn.Module):
 			hv = hv.view(-1, 1, 1, 1)
 
 		w_lg = F.sigmoid((x1 - hv) * self.sgm_scale)
-		totally_white = torch.ones_like(x1)
-		#print("Before feeding into module: ", w_lg.min(), w_lg.max())
-		with torch.no_grad():
-			w_sm = self.mask_extractor(w_lg)
-			totally_white = self.mask_extractor(totally_white)
-		#print(w_sm.shape)
-		w_sm = w_sm.view(w_sm.size(0), 1, self.pool_input_size, self.pool_input_size)
-		totally_white = totally_white.view(totally_white.size(0), 1, self.pool_input_size, self.pool_input_size)
-		#print(w_sm.shape, w_sm.mean().item(), w_sm.min().item(), w_sm.max().item())
-		#w_sm_wr = F.avg_pool2d(w_lg, self.pool_kernel)
-
-		mins, maxes = w_sm.min(-1, keepdim = True)[0].min(-2, keepdim = True)[0], w_sm.max(-1, keepdim = True)[0].max(-2, keepdim = True)[0]
-		#print(mins.shape, maxes.shape)
-		#print(mins, maxes)
-		w_sm = (w_sm - mins) / (maxes - mins)
-		w_sm = w_sm / totally_white
-		w_sm_before = w_sm
-		w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
-
-		
-		#for _x1, _w_sm, _w_sm_wr in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(w_sm_wr)):
-		"""
-		for _x1, _w_sm, _w_sm_wr, _w_lg in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(totally_white), torch.unbind(w_sm_before)):
-			plt.subplot(2, 2, 1)
-			plt.imshow(_x1.detach().cpu().numpy().squeeze())
-			plt.subplot(2, 2, 2)
-			plt.imshow(_w_sm.detach().cpu().numpy().squeeze())
-			plt.subplot(2, 2, 3)
-			plt.imshow(_w_sm_wr.detach().cpu().numpy().squeeze())
-			plt.subplot(2, 2, 4)
-			plt.imshow(_w_lg.detach().cpu().numpy().squeeze())
-			plt.show()
-			#print(_w_sm.min().item(), _w_sm.max().item())
-		"""
-		
-		#w_sm = w_sm - 
-
-
+		w_lg = (torch.tensor(1.) - w_lg) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_lg
 
 		x = self.base(x)
-		#print("Forward: ", x.shape)
-		x = self.base_pool(x, w_sm)
-		#print(x.shape)
-		x = x.view(x.size(0), -1)
+		#print("Shape before base_pool call: ", x.shape)
+		x = self.base_pool(x, w_lg)
+		#print("Shape after base_pool call: ", x.shape)
+		#x = torch.mean(x, dim = (2, 3))
+		#print("Shape after meaning: ", x.shape)
+		x = x.squeeze()
 		x = self.base_fc(x)
 		x_cls = self.mlp_cls(x) if self.mlp_cls is not None else x
 		x_reg = self.mlp_reg(x) if self.mlp_reg is not None else x
@@ -299,73 +281,10 @@ class ClsRegModel(nn.Module):
 		out_reg = self.out_reg(x_reg)
 		return out_cls, out_reg
 
-def append_dropout(model, dropout):
-	for name, module in model.named_children():
-		if len(list(module.children())) > 0:
-			append_dropout(module, dropout)
-		if isinstance(module, nn.ReLU):
-			new_module = nn.Sequential(module, nn.Dropout2d(dropout))
-			setattr(model, name, new_module)
-
-class HalfingLayer(nn.Module):
-	def __init__(self):
-		super(HalfingLayer, self).__init__()
-	def forward(self, x):
-		return x / 2
-
-def change_n_channels(model):
-	for name, module in model.named_children():
-		if len(list(module.children())) > 0:
-			change_n_channels(module)
-		if isinstance(module, nn.Conv2d):
-			#print("Changed to new model")
-			kernel_size = module.kernel_size
-			sum_field = kernel_size[0] * kernel_size[1]
-			new_module = nn.Conv2d(1, 1, kernel_size = kernel_size, stride = module.stride, padding = module.padding, groups = module.groups, bias = False, dilation = module.dilation)
-			new_module.weight = nn.Parameter(torch.ones_like(new_module.weight) / sum_field, requires_grad = False)
-			#print(new_module.weight)
-			#print(new_module.padding)
-			setattr(model, name, new_module)
-		elif isinstance(module, nn.BatchNorm2d):
-			new_module = nn.Identity()
-			setattr(model, name, new_module)
-		elif isinstance(module, Bottleneck):
-			new_module = nn.Sequential(module, HalfingLayer())
-			setattr(model, name, new_module)
-
-def net_to_receptive_extractor(model):
-	model = deepcopy(model)
-	change_n_channels(model)
-	return model
 
 def get_model(args):
-	if args.model_type.find("resnet") != -1:
-		if args.model_type == "resnet34":
-			model = models.resnet34(weights = models.ResNet34_Weights.DEFAULT)
-		elif args.model_type == "resnet18":
-			model = models.resnet18(weights = models.ResNet18_Weights.DEFAULT)
-		elif args.model_type == "resnet50":
-			model = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
-		elif args.model_type == "resnet101":
-			model = models.resnet101(weights = models.ResNet101_Weights.DEFAULT)
-		elif args.model_type == "resnet152":
-			model = models.resnet152(weights = models.ResNet152_Weights.DEFAULT)
-		else:
-			raise NotImplementedError
-
-		if args.n_channels != 3:
-			model.conv1 = nn.Conv2d(args.n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
-		if args.inject_dropout:
-			append_dropout(model, args.dropout)
-			#print(model)
-	else:
-		model = models.swin_v2_t(weights = models.Swin_V2_T_Weights.DEFAULT, dropout = args.dropout)
-		if args.n_channels != 3:
-			model.features[0][0] = nn.Conv2d(args.n_channels, 96, kernel_size = 4, stride = 4)
-	mask_extractor = net_to_receptive_extractor(model)
-	#print(mask_extractor)
-
-	return ClsRegModel(model, mask_extractor, args)
+	model = UNet2D(args.out_feature_dim, args.base_channels)	
+	return ClsRegModel(model, args)
 
 def main():
 	args = get_args()
@@ -383,6 +302,8 @@ def main():
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	model = get_model(args)
 	model = model.to(args.device)
+
+	print(model)
 
 	if args.resume is not None:
 		print("Resuming from ", args.resume, flush = True)

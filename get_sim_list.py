@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 from copy import deepcopy
 import shutil
 import sys
@@ -12,7 +13,7 @@ from utils.misc import str_to_arr
 from ds_gen.depth_map_generation import get_depth_map
 
 from utils.stats import get_num_bins
-from pose_fixing.similarity import kl_sim, corr_sim, mi_sim, comb_corr_sim, dark_threshold_v, dark_threshold_r, cache_base_data, contour_sim, draw_contours
+from pose_fixing.similarity import kl_sim, corr_sim, mi_sim, comb_corr_sim, dark_threshold_v, dark_threshold_r, cache_base_data, contour_sim, draw_contours, cache_multiscale_base_data
 #from domain_transfer.alignment import reg_depth_maps
 
 em_base_path = "./depth-images/"
@@ -822,6 +823,66 @@ def plot_sfs_out_img():
 		#plt.clf()
 
 
+def plot_scaled_contours():
+	chosen_data = [(0, 24), (0, 644), (0, 822), (0, 1058), (1, 1926), (1, 2404), (2, 1320)]
+	out_path = "./depth-images/fix-final-multiscale-contours"
+	os.makedirs(out_path, exist_ok = True)
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
+
+	plt.figure(figsize = (6, 3.5))
+	plt.subplots_adjust(left = 0.01, right = 0.99, top = 0.99, bottom = 0.04, hspace = 0.05, wspace = 0.05)
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			plt.clf()
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			"""
+			if (em_idx, img_idx) not in chosen_data:
+				continue
+			"""
+			if human_eval != 1:
+				continue
+			position, orientation, up = str_to_arr(row["position"]), str_to_arr(row["orientation"]), str_to_arr(row["up"])
+			dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+			rgb_rc = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"), cv2.IMREAD_GRAYSCALE)
+			rgb_rc = rgb_rc[9 : 255, ...]
+			rgb_rc = cv2.resize(rgb_rc, (224, 224))
+			rgb_rc = cv2.cvtColor(rgb_rc, cv2.COLOR_GRAY2RGB)
+			#rgb_rc = rgb_rc / 255.0
+
+			rgb_gt, dep_gt = get_depth_map(p, position, orientation, up, get_outputs = True)
+			rgb_gt = cv2.cvtColor(cv2.cvtColor(rgb_gt, cv2.COLOR_RGBA2GRAY), cv2.COLOR_GRAY2RGB)
+			#rgb_gt = rgb_gt / 255.0
+			
+			scale_rates = [0.1, 0.25, 0.4]
+			colour_list = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
+			rc_contour_list, quantile_list, __ = cache_multiscale_base_data(dep_rc, scale_rates = scale_rates)
+			for q, colour in zip(quantile_list, colour_list):
+				rgb_rc = draw_contours(dep_rc, rgb_rc, q, colour)
+				rgb_gt = draw_contours(dep_gt, rgb_gt, q, colour)
+
+			out_dt = [(rgb_rc, "GSF-RC"), (rgb_gt, "GSF-VC-GT")]
+			num_plots = 1, 2
+
+
+			for i, (out_img, out_title) in enumerate(out_dt):
+				plt.subplot(*num_plots, i + 1)
+				plt.imshow(out_img)
+				plt.axis("off")
+				plt.title(out_title, fontsize = 20, y = -0.15)
+				all_boxes = []
+				for q, colour in zip(scale_rates, ["red", "green", "blue"]):
+					colour_box = mpatches.Patch(color = colour, label = f"{q:.2f}")
+					all_boxes.append(colour_box)
+				plt.legend(handles = all_boxes, loc = "upper right", framealpha = 0.5, frameon = True)
+			#plt.suptitle(f"REAL-{em_idx}-{img_idx}, {human_eval}", y = 0.05)
+
+			#plt.suptitle(f"REAL-{em_idx}, Frame-{img_idx}")
+			#plt.show()
+			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
+
+
 
 if __name__ == '__main__':
 	#plt.figure(figsize = (20, 15))
@@ -882,5 +943,6 @@ if __name__ == '__main__':
 	#plot_final_fixes(True)
 	#plot_out_img(proj = False, show_fix = False)
 	#sfs_distrib()
-	plot_sfs_out_img()
+	#plot_sfs_out_img()
 	#sfs_distrib_summ()
+	plot_scaled_contours()

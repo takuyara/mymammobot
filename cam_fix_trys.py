@@ -14,7 +14,7 @@ from multiprocessing import Pool
 from ds_gen.camera_features import camera_params
 from utils.cl_utils import project_to_cl, load_all_cls, in_mesh_bounds, get_cl_direction
 from utils.geometry import random_points_in_sphere, arbitrary_perpendicular_vector, rotate_single_vector, rotate_all_degrees, get_vector_angle, random_perpendicular_offsets
-from pose_fixing.similarity import comb_corr_sim, reg_mse_sim, mi_sim, corr_sim
+from pose_fixing.similarity import comb_corr_sim, reg_mse_sim, mi_sim, corr_sim, cache_base_data, contour_corr_sim
 from ds_gen.depth_map_generation import get_depth_map
 from pose_fixing.move_camera import randomise_params
 from utils.stats import weighted_corr
@@ -146,36 +146,33 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 	old_up = np.array([-0.17030983, 0.58201775, -0.79514143])
 	"""
 
-	"""
-	Best
+	
+	#Best
 	new_position = np.array([-35.23436981, -26.07758012, -161.09738046])
 	new_orientation = np.array([-0.86110491, -0.40747873, -0.30407139])
-	new_up = np.array([0.50811759, -0.71058364, -0.4867108])
-	"""
-	
+	new_up = np.array([0.50811759, -0.71058364, -0.4867108])	
 
 	
-	#Iter 1
-	new_position = np.array([-33.013039, -27.23421861, -162.06400843])
-	new_orientation = np.array([-0.91553654, -0.17466719, -0.36233164])
-	new_up = np.array([0.34834557, -0.79469893, -0.49710057])
+	new_position_1 = np.array([-33.013039, -27.23421861, -162.06400843])
+	new_orientation_1 = np.array([-0.91553654, -0.17466719, -0.36233164])
+	new_up_1 = np.array([0.34834557, -0.79469893, -0.49710057])
 	
 
 	
 	#Iter 2
 	"""
-	t_position = np.array([-32.74093312, -24.63603652, -161.3075079])
-	t_orientation = np.array([-0.74968252, -0.45564735, -0.47996001])
-	desired_up = np.array([0.66018554, -0.56548868, -0.49434564])
+	new_position = np.array([-32.74093312, -24.63603652, -161.3075079])
+	new_orientation = np.array([-0.74968252, -0.45564735, -0.47996001])
+	new_up = np.array([0.66018554, -0.56548868, -0.49434564])
 	"""
 	
-
+	#Iter 3
 	"""
-	Iter 3
-	t_position = np.array([-30.59947988, -24.11401394, -160.20225996])
-	t_orientation = np.array([-0.72133924, -0.39416521, -0.56947651])
-	desired_up = np.array([0.69216001, -0.43897778, -0.57289879])
+	new_position = np.array([-30.59947988, -24.11401394, -160.20225996])
+	new_orientation = np.array([-0.72133924, -0.39416521, -0.56947651])
+	new_up = np.array([0.69216001, -0.43897778, -0.57289879])
 	"""
+	
 
 	"""
 	virtual_depth_map = get_depth_map(p, camera_params["focal_length"], t_position, t_orientation, desired_up)
@@ -351,11 +348,18 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 		dist = np.mean((np.log(x2) - np.log(x1) + alp) ** 2) / 2
 		return dist
 
+	plt.figure(figsize = (7.5, 3.5))
+	plt.subplots_adjust(left = 0.01, right = 0.99, top = 0.99, bottom = 0.156, hspace = 0.05, wspace = 0.05)
+
 	old_rgb, old_dep = get_depth_map(p, old_position, old_orientation, old_up, get_outputs = True)
-	err_old, mask_old, corr_old = plot_it(old_rgb, old_dep)
+	#err_old, mask_old, corr_old = plot_it(old_rgb, old_dep)
 	#err_old, mask_old, corr_old = plot_it(old_rgb, old_dep, mean_method = "simple")
 	new_rgb, new_dep = get_depth_map(p, new_position, new_orientation, new_up, get_outputs = True)
-	err_new, mask_new, corr_new = plot_it(new_rgb, new_dep)
+	#err_new, mask_new, corr_new = plot_it(new_rgb, new_dep)
+
+	new_rgb_1, new_dep_1 = get_depth_map(p, new_position_1, new_orientation_1, new_up_1, get_outputs = True)
+	#err_new_1, mask_new_1, corr_new_1 = plot_it(new_rgb_1, new_dep_1)
+
 	#err_new, mask_new, corr_new = plot_it(new_rgb, new_dep, mean_method = "simple")
 
 	"""
@@ -363,8 +367,40 @@ def check_rotation(frame_idx, em_path, em_depth_path, output_path, args):
 	plt.show()
 	exit()
 	"""
+	out_path = "./depth-images/cam-fix-samples"
+	os.makedirs(out_path, exist_ok = True)
 
+	bd = cache_base_data(real_depth_map, rate = 0.1)
 
+	for t_name, t_rgb, t_dep in [("real", real_rgb, real_depth_map), ("cand_1", old_rgb, old_dep), ("cand_2", new_rgb_1, new_dep_1), ("cand_3", new_rgb, new_dep)]:
+		t_rgb = cv2.cvtColor(t_rgb, cv2.COLOR_RGBA2GRAY)
+		print(t_name, corr_sim(real_depth_map, t_dep), comb_corr_sim(real_depth_map, t_dep), mi_sim(real_depth_map, t_dep, num_bins = 30), log_error(real_depth_map, t_dep), reg_mse_sim(real_depth_map, t_dep, light_weight = 1, dark_weight = 1))
+		print(t_name, contour_corr_sim(t_dep, real_depth_map, *bd))
+		if t_name == "real":
+			t_rgb = t_rgb[9 : 255, ...]
+			t_rgb = cv2.resize(t_rgb, (224, 224))
+			t_rgb = t_rgb.astype("float64") / 255.0
+			out_dt = [(t_rgb, "GSF-RC"), (t_dep, "DM-RC-SFS")]
+		else:
+			t_rgb = t_rgb.astype("float64") / 255.0
+			out_dt = [(t_rgb, "GSF-VC"), (t_dep, "DM-VC-Mesh")]
+		num_plots = 1, 2
+		
+		for i, (out_img, out_title) in enumerate(out_dt):
+			plt.subplot(*num_plots, i + 1)
+			if out_title.find("DM") != -1:
+				plt.imshow(out_img)
+				plt.colorbar()
+			else:
+				plt.imshow(out_img, cmap = "gray", vmin = 0, vmax = 1)
+			plt.axis("off")
+			plt.title(out_title, fontsize = 20, y = -0.15)
+	
+		#plt.show()
+		plt.savefig(os.path.join(out_path, f"{t_name}.png"))
+		plt.clf()
+
+	exit()
 
 	print("Old sim (corr, log): ", corr_sim(real_depth_map, old_dep), comb_corr_sim(real_depth_map, old_dep), mi_sim(real_depth_map, old_dep, num_bins = 30), log_error(real_depth_map, old_dep))
 	old_iou, old_hd, contours_img_r_old, contours_img_v_old = analysis_corr(real_depth_map, old_dep)

@@ -121,15 +121,13 @@ def contour_sim(img, base_contours, quantile, light_mask = None):
 	hausdorff_dist = max(DHD(contours, base_contours)[0], DHD(base_contours, contours)[0])
 	return -hausdorff_dist
 
-def draw_contours(img, quantile):
-	light_mask = get_light_mask(img, quantile = quantile)
+def draw_contours(dep_img, rgb_img, quantile, colour):
+	light_mask = get_light_mask(dep_img, quantile = quantile)
 	contours, __ = cv2.findContours(light_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-	img_normed = (img - img.min()) / (img.max() - img.min())
-	img_normed = img_normed.reshape(*img_normed.shape, 1).astype(np.float32)
-	#print(img_normed, img_normed.shape)
-	rgb_img = cv2.cvtColor(img_normed, cv2.COLOR_GRAY2BGR)
-	contours_img = cv2.drawContours(rgb_img, contours, -1, (0, 255, 0), 3)
-	return contours_img
+	#contours_img = cv2.drawContours(rgb_img, contours, -1, colour, 3)
+	for t_cont in contours:
+		rgb_img = cv2.polylines(rgb_img, t_cont, isClosed = True, color = colour, thickness = 2)
+	return rgb_img
 
 def contour_corr_sim(img, base_img, base_contours, quantile, base_light_mask):
 	light_mask = get_light_mask(img, quantile = quantile)
