@@ -64,6 +64,7 @@ def get_args():
 	parser.add_argument("--dark-hist-rate", type = float, default = 0.2)
 	parser.add_argument("--border-padding", type = int, default = 0)
 	parser.add_argument("--relative-values", action = "store_true")
+	parser.add_argument("--stretch-loss-rate", type = float, default = 0.1)
 	return parser.parse_args()
 
 
@@ -92,12 +93,14 @@ def get_transform(training, args):
 				img = resize(img)
 		else:
 			img = resize(img)
-		img = (img - img.min()) / (img.max() - img.min())
+		stretch = img.max() - img.min()
+		#print(stretch)
+		img = (img - img.min()) / stretch
 		img = transforms.functional.pad(img, args.border_padding)
 		if args.bins > 0:
 			print("Using histogram to reduce noise.")
 			img = torch.minimum(torch.floor(img * args.bins), torch.tensor(args.bins - 1)) / args.bins
-		return img.repeat(args.n_channels, 1, 1)
+		return img.repeat(args.n_channels, 1, 1), stretch
 	return fun
 
 class PreloadDataset(Dataset):
@@ -129,7 +132,7 @@ class PreloadDataset(Dataset):
 			plt.show()
 		"""
 
-		return img, lb, reg
+		return *img, lb, reg
 	def __len__(self):
 		return len(self.img_data)
 
@@ -154,7 +157,7 @@ class Rescaler(nn.Module):
 		value = torch.stack(value, dim = 0).detach()
 		w = self.mlp(hst).unsqueeze(-1).unsqueeze(-1)
 		out = x * w
-		return out, value
+		return out, w, value
 
 class WeightedAvgPool(nn.Module):
 	def __init__(self, args):
@@ -172,11 +175,12 @@ class WeightedAvgPool(nn.Module):
 
 
 		x = x.view(x.size(0), -1, w.size(2), w.size(3))
-		w = w / torch.sum(w, dim = (1, 2, 3), keepdim = True)
+		#w = w / torch.sum(w, dim = (1, 2, 3), keepdim = True)
 		#print(x.shape, w.shape)
 		x = x * w
 		#print("Weighted mean", x.mean().item())
-		x = self.avgpool(x)
+		x = torch.sum(x, dim = (2, 3), keepdim = True)
+		#print(x.shape)
 		return x
 
 class PlaceHolder(nn.Module):
@@ -238,7 +242,7 @@ class ClsRegModel(nn.Module):
 	def forward(self, x):
 		x1 = x
 		if self.rescaler is not None:
-			x, hv = self.rescaler(x)
+			x, stretch, hv = self.rescaler(x)
 			hv = hv.view(-1, 1, 1, 1)
 
 		w_lg = F.sigmoid((x1 - hv) * self.sgm_scale)
@@ -253,14 +257,17 @@ class ClsRegModel(nn.Module):
 		#print(w_sm.shape, w_sm.mean().item(), w_sm.min().item(), w_sm.max().item())
 		#w_sm_wr = F.avg_pool2d(w_lg, self.pool_kernel)
 
-		mins, maxes = w_sm.min(-1, keepdim = True)[0].min(-2, keepdim = True)[0], w_sm.max(-1, keepdim = True)[0].max(-2, keepdim = True)[0]
-		#print(mins.shape, maxes.shape)
-		#print(mins, maxes)
-		w_sm = (w_sm - mins) / (maxes - mins)
+		# Previous working version: uncomment this
+		#w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
+		w_sm_before = w_sm
+
+		#totally_white = totally_white / torch.sum(totally_white, dim = (1, 2, 3), keepdim = True)
 		w_sm = w_sm / totally_white
 		w_sm_before = w_sm
+		mins, maxes = w_sm.min(-1, keepdim = True)[0].min(-2, keepdim = True)[0], w_sm.max(-1, keepdim = True)[0].max(-2, keepdim = True)[0]
+		w_sm = (w_sm - mins) / (maxes - mins)
 		w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
-
+		w_sm = w_sm / torch.sum(w_sm, dim = (1, 2, 3), keepdim = True)
 		
 		#for _x1, _w_sm, _w_sm_wr in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(w_sm_wr)):
 		"""
@@ -274,11 +281,9 @@ class ClsRegModel(nn.Module):
 			plt.subplot(2, 2, 4)
 			plt.imshow(_w_lg.detach().cpu().numpy().squeeze())
 			plt.show()
-			#print(_w_sm.min().item(), _w_sm.max().item())
-		"""
-		
+			#print(_w_sm.min().item(), _w_sm.max().item())		
 		#w_sm = w_sm - 
-
+		"""
 
 
 		x = self.base(x)
@@ -291,7 +296,7 @@ class ClsRegModel(nn.Module):
 		x_reg = self.mlp_reg(x) if self.mlp_reg is not None else x
 		out_cls = self.out_cls(x_cls)
 		out_reg = self.out_reg(x_reg)
-		return out_cls, out_reg
+		return out_cls, out_reg, stretch
 
 def append_dropout(model, dropout):
 	for name, module in model.named_children():
@@ -394,13 +399,14 @@ def main():
 				model.eval()
 			y_true, y_pred = [], []
 			coord_trues, coord_preds = [], []
+			stretch_trues, stretch_preds = [], []
 			sum_loss = num_loss = 0
-			for imgs, labels, coords in loader:
+			for imgs, stretches, labels, coords in loader:
 				#print("Batch")
-				imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
+				imgs, stretches, labels, coords = imgs.to(args.device).float(), stretches.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
 				with torch.set_grad_enabled(phase == "train"):
-					logits, pred_coords = model(imgs)
-					loss = nn.CrossEntropyLoss()(logits, labels) + args.reg_loss_rate * nn.MSELoss()(coords, pred_coords)
+					logits, pred_coords, pred_stretches = model(imgs)
+					loss = nn.CrossEntropyLoss()(logits, labels) + args.reg_loss_rate * nn.MSELoss()(coords, pred_coords) + args.stretch_loss_rate * nn.MSELoss()(stretches, pred_stretches)
 				if phase == "train":
 					optimiser.zero_grad()
 					loss.backward()
@@ -412,10 +418,14 @@ def main():
 				y_pred.append(preds.cpu().numpy())
 				coord_trues.append(coords.cpu().numpy())
 				coord_preds.append(pred_coords.detach().cpu().numpy())
+				stretch_trues.append(stretches.cpu().numpy())
+				stretch_preds.append(pred_stretches.detach().cpu().numpy())
 			y_true, y_pred = np.concatenate(y_true, axis = 0), np.concatenate(y_pred, axis = 0)
 			coord_trues, coord_preds = np.concatenate(coord_trues, axis = 0), np.concatenate(coord_preds, axis = 0)
+			stretch_trues, stretch_preds = np.concatenate(stretch_trues, axis = 0), np.concatenate(stretch_preds, axis = 0)
 			loss, acc, f1, l1 = sum_loss / num_loss, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro"), np.mean(np.abs(coord_trues - coord_preds))
-			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}, reg L1 = {:.4f}".format(epoch, phase, loss, acc, f1, l1), flush = True)
+			stre_l1 = np.mean(np.abs(stretch_trues - stretch_preds))
+			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}, reg L1 = {:.4f}, stre l1 = {:.2f}".format(epoch, phase, loss, acc, f1, l1, stre_l1), flush = True)
 			if phase == "val" and acc > max_acc:
 				max_acc, max_f1, max_l1, best_weights = acc, f1, l1, deepcopy(model.state_dict())
 				if max_acc > 0.65:
