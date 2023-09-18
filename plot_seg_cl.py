@@ -13,8 +13,8 @@ from ds_gen.depth_map_generation import get_depth_map
 import matplotlib.pyplot as plt
 
 airway_path = "./meshes/Airway_Phantom_AdjustSmooth.stl"
-cl_path = "./CL"
-out_path = "./seg_cl_0"
+cl_path = "./CL1"
+out_path = "./seg_cl_1"
 
 cl_paths = [os.path.join(cl_path, t_path) for t_path in os.listdir(cl_path) if t_path.endswith(".dat")]
 
@@ -38,7 +38,7 @@ def cl_to_poly(path):
 def p2p(points):
 	points = np.array(points)
 	poly = pv.lines_from_points(points)
-	tube = poly.tube(radius = 0.2)
+	tube = poly.tube(radius = 0.5)
 	return tube
 
 def get_points(p, path, idx):
@@ -62,7 +62,7 @@ def main():
 	airway = pv.read(airway_path)
 	p = pv.Plotter()
 	#p = pv.Plotter(off_screen = True, window_size = (224, 224))
-	p.add_mesh(airway, opacity = 0.5)
+	p.add_mesh(airway, opacity = 0.2)
 	os.makedirs(out_path, exist_ok = True)
 	#p.add_mesh(airway)
 
@@ -95,13 +95,18 @@ def main():
 		if len(this_seg) == 42 or len(this_seg) == 408:
 			# Should merge these 2 segs when using full CL
 			pass
-		p.add_mesh(p2p(this_seg), color = pv.Color(colour_names[i % len(colour_names)]))
+		p.add_mesh(p2p(this_seg), color = pv.Color(colour_names[i % len(colour_names)]), label = f"CL_{i + 1}")
 		#print(this_seg.shape, radius.shape)
 		#out = np.concatenate([this_seg, radius.reshape(-1, 1)], axis = -1)
+		for i in range(len(this_seg) - 1):
+			
 		all_radii.append(radius)
 		#print(out.shape)
 		#np.save(os.path.join(out_path, f"CL{i}.npy"), out)
 
+	p.add_legend()
+	p.show()
+	exit()
 
 
 	with open("aggred_res.csv", newline = "") as f:
@@ -162,10 +167,12 @@ def main():
 	#p.add_points(gen_points, render_points_as_spheres = True, point_size = 5, color = "green")
 	#p.show()
 
+	"""
 	plt.hist(np.concatenate(all_radii), bins = 20, density = True)
 	plt.xlabel("Lumen Radius (Millimetres)")
 	plt.ylabel("Distribution Density")
 	plt.show()
+	"""
 
 if __name__ == '__main__':
 	main()

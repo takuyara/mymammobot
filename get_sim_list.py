@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from copy import deepcopy
 import shutil
+import torch
+from torchvision import transforms
 import sys
 import pyvista as pv
 from utils.misc import str_to_arr
@@ -883,6 +885,123 @@ def plot_scaled_contours():
 			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
 
 
+def plot_sfs_vs_mesh_out():
+	out_path = "./depth-images/fix-final-sfs-vs-mesh-out"
+	os.makedirs(out_path, exist_ok = True)
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
+	blur = transforms.GaussianBlur(21, 7)
+	chosen_data = [(0, 32), (0, 92), (1, 182), (1, 1044), (2, 1336), (2, 1838)]
+
+
+	plt.figure(figsize = (12, 3.5))
+	plt.subplots_adjust(left = 0.01, right = 0.99, top = 0.99, bottom = 0.15, hspace = 0.05, wspace = 0.05)
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			plt.clf()
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			if (em_idx, img_idx) not in chosen_data:
+				continue
+			position, orientation, up = str_to_arr(row["position"]), str_to_arr(row["orientation"]), str_to_arr(row["up"])
+			dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+			rgb_gt, dep_gt = get_depth_map(p, position, orientation, up, get_outputs = True)
+			
+			rgb_rc = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"), cv2.IMREAD_GRAYSCALE)
+			rgb_rc = rgb_rc[9 : 255, ...]
+			rgb_rc = cv2.resize(rgb_rc, (224, 224)) / 255.0
+			"""
+
+			dep_gt_aligned = torch.minimum(torch.tensor(dep_gt).unsqueeze(0), torch.tensor(100.0))
+			dep_gt_aligned = blur(dep_gt_aligned).numpy().squeeze()
+			dep_gt_aligned = (dep_gt_aligned - dep_gt_aligned.min()) / (dep_gt_aligned.max() - dep_gt_aligned.min())
+			dep_rc_aligned = (dep_rc - dep_rc.min()) / (dep_rc.max() - dep_rc.min())
+
+			plt.subplot(1, 3, 1)
+			plt.imshow(dep_rc_aligned)
+			plt.subplot(1, 3, 2)
+			plt.imshow(dep_gt_aligned)
+			plt.subplot(1, 3, 3)
+			plt.imshow(np.abs(dep_rc_aligned - dep_gt_aligned))
+			"""
+
+			out_dt = [(rgb_rc, "GSF-RC"), (dep_rc, "DM-SFS"), (dep_gt, "DM-Mesh")]
+			num_plots = 1, 3
+
+
+			for i, (out_img, out_title) in enumerate(out_dt):
+				plt.subplot(*num_plots, i + 1)
+				if out_title.find("DM") != -1:
+					plt.imshow(out_img)
+					plt.colorbar()
+				else:
+					plt.imshow(out_img, cmap = "gray", vmin = 0, vmax = 1)
+				plt.axis("off")
+				plt.title(out_title, fontsize = 20, y = -0.15)
+						#plt.suptitle(f"REAL-{em_idx}-{img_idx}, {human_eval}", y = 0.05)
+
+			#plt.suptitle(f"REAL-{em_idx}, Frame-{img_idx}")
+			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
+			plt.clf()
+
+
+
+def plot_sfs_vs_mesh():
+	out_path = "./depth-images/fix-final-sfs-vs-mesh-out"
+	os.makedirs(out_path, exist_ok = True)
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
+	blur = transforms.GaussianBlur(21, 7)
+
+	#plt.figure(figsize = (6, 3.5))
+	#plt.subplots_adjust(left = 0.01, right = 0.99, top = 0.99, bottom = 0.04, hspace = 0.05, wspace = 0.05)
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			plt.clf()
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			if human_eval != 1:
+				continue
+			position, orientation, up = str_to_arr(row["position"]), str_to_arr(row["orientation"]), str_to_arr(row["up"])
+			dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+			rgb_gt, dep_gt = get_depth_map(p, position, orientation, up, get_outputs = True)
+
+			dep_gt_aligned = torch.minimum(torch.tensor(dep_gt).unsqueeze(0), torch.tensor(100.0))
+			dep_gt_aligned = blur(dep_gt_aligned).numpy().squeeze()
+			dep_gt_aligned = (dep_gt_aligned - dep_gt_aligned.min()) / (dep_gt_aligned.max() - dep_gt_aligned.min())
+			dep_rc_aligned = (dep_rc - dep_rc.min()) / (dep_rc.max() - dep_rc.min())
+
+			plt.subplot(1, 3, 1)
+			plt.imshow(dep_rc_aligned)
+			plt.subplot(1, 3, 2)
+			plt.imshow(dep_gt_aligned)
+			plt.subplot(1, 3, 3)
+			plt.imshow(np.abs(dep_rc_aligned - dep_gt_aligned))
+
+			"""
+			out_dt = [(rgb_rc, "GSF-RC"), (rgb_gt, "GSF-VC-GT")]
+			num_plots = 1, 2
+
+
+			for i, (out_img, out_title) in enumerate(out_dt):
+				plt.subplot(*num_plots, i + 1)
+				plt.imshow(out_img)
+				plt.axis("off")
+				plt.title(out_title, fontsize = 20, y = -0.15)
+				all_boxes = []
+				for q, colour in zip(scale_rates, ["red", "green", "blue"]):
+					colour_box = mpatches.Patch(color = colour, label = f"{q:.2f}")
+					all_boxes.append(colour_box)
+				plt.legend(handles = all_boxes, loc = "upper right", framealpha = 0.5, frameon = True)
+			"""
+			#plt.suptitle(f"REAL-{em_idx}-{img_idx}, {human_eval}", y = 0.05)
+
+			#plt.suptitle(f"REAL-{em_idx}, Frame-{img_idx}")
+			#plt.show()
+			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
+
+
+
 
 if __name__ == '__main__':
 	#plt.figure(figsize = (20, 15))
@@ -945,4 +1064,5 @@ if __name__ == '__main__':
 	#sfs_distrib()
 	#plot_sfs_out_img()
 	#sfs_distrib_summ()
-	plot_scaled_contours()
+	#plot_scaled_contours()
+	plot_sfs_vs_mesh_out()

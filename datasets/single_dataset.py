@@ -72,7 +72,6 @@ class PreloadDataset(Dataset):
 		self.imgs = np.load(os.path.join(base_dir, f"{dir_list[0]}_img.npy"))
 		self.labels = np.load(os.path.join(base_dir, f"{dir_list[0]}_label.npy"))
 		self.transform_img, self.transform_pose = transform_img, transform_pose
-		self.img_size = img_size
 		
 	def __len__(self):
 		return len(self.imgs)

@@ -378,6 +378,29 @@ def get_img_transform(data_stats_path, method, n_channels, train, args):
 			#labels = (labels - mean) / std
 			return torch.tensor(res).float()
 		return img_to_hist_even_more_complex
+	elif method == "success_augs":
+		blur = transforms.GaussianBlur(21, 7)
+		elastic = transforms.ElasticTransform(alpha = 50., sigma = 5.)
+		persp = transforms.RandomPerspective(distortion_scale = 0.1, p = 0.5)
+		crop_train = transforms.RandomResizedCrop(args.target_size, scale = (0.9, 1.0), ratio = (0.95, 1.05))
+		resize = transforms.Resize(args.target_size)
+		def fun(img):
+			img = torch.tensor(img).unsqueeze(0)
+			if training:
+				img = blur(img)
+				img = torch.minimum(img, torch.tensor(args.cap))
+				if args.aug:
+					img = elastic(img)
+					img = persp(img)
+					img = crop_train(img)
+				else:
+					img = resize(img)
+			else:
+				img = resize(img)
+			img = (img - img.min()) / (img.max() - img.min())
+			img = transforms.functional.pad(img, args.border_padding)
+			return img.repeat(n_channels, 1, 1)
+		return fun
 	else:
 		raise NotImplementedError
 

@@ -18,7 +18,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 hidden_args = ["base_path", "val_path", "num_workers", "device", "n_channels", "epochs", "save_path", "binary", "cap", "target_size", "four_fold", "four_thres",
-	"uses_sigmoid", "uses_bn", "reg_dims", "mlp_in_features", "inject_dropout", "normalise", "bins", "dark_thres", "sigmoid_scale", "pool_input_size", "pool_channels", "num_classes", "aug"]
+	"uses_sigmoid", "reg_dims", "mlp_in_features", "inject_dropout", "normalise", "bins", "dark_thres", "sigmoid_scale", "pool_input_size", "pool_channels", "num_classes", "aug"]
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -64,7 +64,9 @@ def get_args():
 	parser.add_argument("--dark-hist-rate", type = float, default = 0.2)
 	parser.add_argument("--border-padding", type = int, default = 0)
 	parser.add_argument("--relative-values", action = "store_true")
-	parser.add_argument("--stretch-loss-rate", type = float, default = 0.1)
+	parser.add_argument("--stretch-loss-rate", type = float, default = 0.)
+	parser.add_argument("--pool-dropout", type = float, default = 0.1)
+	parser.add_argument("--mlp-dropout", type = float, default = 0.1)
 	return parser.parse_args()
 
 
@@ -164,6 +166,7 @@ class WeightedAvgPool(nn.Module):
 		super(WeightedAvgPool, self).__init__()
 		self.avgpool = nn.AdaptiveAvgPool2d(1)
 		self.relative_values = args.relative_values
+		self.dropout = nn.Dropout2d(args.pool_dropout)
 	def forward(self, x, w):
 		#print("Valued Mask avg", w.mean().item())
 		#print("Prev mean", x.mean().item())
@@ -177,7 +180,7 @@ class WeightedAvgPool(nn.Module):
 		x = x.view(x.size(0), -1, w.size(2), w.size(3))
 		#w = w / torch.sum(w, dim = (1, 2, 3), keepdim = True)
 		#print(x.shape, w.shape)
-		x = x * w
+		x = self.dropout(x * w)
 		#print("Weighted mean", x.mean().item())
 		x = torch.sum(x, dim = (2, 3), keepdim = True)
 		#print(x.shape)
@@ -214,7 +217,7 @@ class ClsRegModel(nn.Module):
 			self.batch_norm = None
 		if args.rescaler_bins > 0:
 			print("Using rescaler.")
-			self.rescaler = Rescaler(args.rescaler_bins, args.dropout, args.dark_hist_rate)
+			self.rescaler = Rescaler(args.rescaler_bins, args.mlp_dropout, args.dark_hist_rate)
 		else:
 			self.rescaler = None
 
@@ -227,11 +230,11 @@ class ClsRegModel(nn.Module):
 		mask_extractor.fc = nn.Identity()
 		self.mask_extractor = mask_extractor
 		if args.cls_neurons != [0]:
-			self.mlp_cls, cls_final_dim = get_mlp(args.mlp_in_features, args.cls_neurons, args.dropout)
+			self.mlp_cls, cls_final_dim = get_mlp(args.mlp_in_features, args.cls_neurons, args.mlp_dropout)
 		else:
 			self.mlp_cls, cls_final_dim = None, args.mlp_in_features
 		if args.reg_neurons != [0]:
-			self.mlp_reg, reg_final_dim = get_mlp(args.mlp_in_features, args.reg_neurons, args.dropout)
+			self.mlp_reg, reg_final_dim = get_mlp(args.mlp_in_features, args.reg_neurons, args.mlp_dropout)
 		else:
 			self.mlp_reg, reg_final_dim = None, args.mlp_in_features
 		self.out_cls = nn.Linear(cls_final_dim, args.num_classes)
@@ -285,7 +288,8 @@ class ClsRegModel(nn.Module):
 		#w_sm = w_sm - 
 		"""
 
-
+		if self.batch_norm is not None:
+			x = self.batch_norm(x)
 		x = self.base(x)
 		#print("Forward: ", x.shape)
 		x = self.base_pool(x, w_sm)
