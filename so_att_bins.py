@@ -359,6 +359,7 @@ def get_model(args):
 
 def main():
 	args = get_args()
+	print(args)
 	for arg_name, arg_value in vars(args).items():
 		if arg_name not in hidden_args:
 			print(f"{arg_name}: {arg_value}")
