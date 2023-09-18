@@ -418,7 +418,7 @@ def main():
 			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}, reg L1 = {:.4f}, stre l1 = {:.2f}".format(epoch, phase, loss, acc, f1, l1, stre_l1), flush = True)
 			if phase == "val" and acc > max_acc:
 				max_acc, max_f1, max_l1, best_weights = acc, f1, l1, deepcopy(model.state_dict())
-				torch.save(best_weights, os.path.join(args.save_path, f"ckpt-{max_acc:.4f}-{max_l1:.4f}.pt"))
+			torch.save(model.state_dict(), os.path.join(args.save_path, f"ckpt-{acc:.4f}-{l1:.4f}-{epoch}.pt"))
 		print("Epoch time: {:.2f} mins".format((time.time() - st_time) / 60))
 		scheduler.step()
 	print("Max: ", max_acc, max_f1, max_l1)

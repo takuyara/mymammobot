@@ -891,11 +891,11 @@ def plot_sfs_vs_mesh_out():
 	p = pv.Plotter(off_screen = True, window_size = (224, 224))
 	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
 	blur = transforms.GaussianBlur(21, 7)
-	chosen_data = [(0, 32), (0, 92), (1, 182), (1, 1044), (2, 1336), (2, 1838)]
+	chosen_data = [(0, 52), (0, 92), (1, 182), (1, 1044), (2, 1336), (2, 1838)]
 
 
 	plt.figure(figsize = (12, 3.5))
-	plt.subplots_adjust(left = 0.01, right = 0.99, top = 0.99, bottom = 0.15, hspace = 0.05, wspace = 0.05)
+	plt.subplots_adjust(left = 0.01, right = 0.96, top = 0.99, bottom = 0.15, hspace = 0.05, wspace = 0.05)
 	with open("aggred_res.csv", newline = "") as f:
 		reader = csv.DictReader(f)
 		for row in tqdm(reader):
@@ -933,15 +933,18 @@ def plot_sfs_vs_mesh_out():
 				plt.subplot(*num_plots, i + 1)
 				if out_title.find("DM") != -1:
 					plt.imshow(out_img)
-					plt.colorbar()
+					cbar = plt.colorbar()
+					cbar.ax.tick_params(labelsize = 25)
 				else:
 					plt.imshow(out_img, cmap = "gray", vmin = 0, vmax = 1)
 				plt.axis("off")
-				plt.title(out_title, fontsize = 20, y = -0.15)
+				plt.title(out_title, fontsize = 25, y = -0.15)
 						#plt.suptitle(f"REAL-{em_idx}-{img_idx}, {human_eval}", y = 0.05)
 
 			#plt.suptitle(f"REAL-{em_idx}, Frame-{img_idx}")
+			#plt.show()
 			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
+
 			plt.clf()
 
 
@@ -1001,6 +1004,32 @@ def plot_sfs_vs_mesh():
 			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
 
 
+def plot_sfs_vs_mesh_range():
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
+	blur = transforms.GaussianBlur(21, 7)
+	rc_ranges, gt_ranges = [], []
+
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			plt.clf()
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			if human_eval != 1:
+				continue
+			position, orientation, up = str_to_arr(row["position"]), str_to_arr(row["orientation"]), str_to_arr(row["up"])
+			dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+			rgb_gt, dep_gt = get_depth_map(p, position, orientation, up, get_outputs = True)
+
+			rc_ranges.append(dep_rc.max() - dep_rc.min())
+			gt_ranges.append(dep_gt.max() - dep_gt.min())
+	
+	np.save("rc_ranges.npy", np.array(rc_ranges))
+	np.save("gt_ranges.npy", np.array(gt_ranges))
+	plt.scatter(rc_ranges, gt_ranges)
+	plt.xlabel("Range of DM-SFS", fontsize = 20)
+	plt.ylabel("Range of DM-Mesh", fontsize = 20)
+	plt.show()
 
 
 if __name__ == '__main__':
@@ -1065,4 +1094,4 @@ if __name__ == '__main__':
 	#plot_sfs_out_img()
 	#sfs_distrib_summ()
 	#plot_scaled_contours()
-	plot_sfs_vs_mesh_out()
+	plot_sfs_vs_mesh_range()
