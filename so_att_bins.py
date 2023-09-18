@@ -67,6 +67,8 @@ def get_args():
 	parser.add_argument("--stretch-loss-rate", type = float, default = 0.)
 	parser.add_argument("--pool-dropout", type = float, default = 0.1)
 	parser.add_argument("--mlp-dropout", type = float, default = 0.1)
+	parser.add_argument("--dont-rescale", action = "store_true")
+	parser.add_argument("--dont-weighted-mask", action = "store_true")
 	return parser.parse_args()
 
 
@@ -85,9 +87,9 @@ def get_transform(training, args):
 	def fun(img):
 		img = torch.tensor(img).unsqueeze(0)
 		if training:
-			img = blur(img)
-			img = torch.minimum(img, torch.tensor(args.cap))
 			if args.aug:
+				img = blur(img)
+				img = torch.minimum(img, torch.tensor(args.cap))
 				img = elastic(img)
 				img = persp(img)
 				img = crop_train(img)
@@ -139,11 +141,12 @@ class PreloadDataset(Dataset):
 		return len(self.img_data)
 
 class Rescaler(nn.Module):
-	def __init__(self, bins, dropout, height_rate):
+	def __init__(self, bins, dropout, height_rate, dont_rescale):
 		super(Rescaler, self).__init__()
 		self.mlp = get_mlp(bins, [32, 64, 128, 1], dropout)[0]
 		self.bins = bins
 		self.height_rate = height_rate
+		self.dont_rescale = dont_rescale
 	def forward(self, x):
 		hst = []
 		value = []
@@ -158,7 +161,10 @@ class Rescaler(nn.Module):
 		hst = torch.stack(hst, dim = 0).detach()
 		value = torch.stack(value, dim = 0).detach()
 		w = self.mlp(hst).unsqueeze(-1).unsqueeze(-1)
-		out = x * w
+		if not self.dont_rescale:
+			out = x * w
+		else:
+			out = x
 		return out, w, value
 
 class WeightedAvgPool(nn.Module):
@@ -208,6 +214,8 @@ class ClsRegModel(nn.Module):
 		self.pool_input_size = args.pool_input_size
 		self.target_size = args.target_size
 		self.border_padding = args.border_padding
+		self.dont_rescale = args.dont_rescale
+		self.dont_weighted_mask = args.dont_weighted_mask
 
 		self.dark_thres = args.dark_thres
 		self.base = base
@@ -217,7 +225,7 @@ class ClsRegModel(nn.Module):
 			self.batch_norm = None
 		if args.rescaler_bins > 0:
 			print("Using rescaler.")
-			self.rescaler = Rescaler(args.rescaler_bins, args.mlp_dropout, args.dark_hist_rate)
+			self.rescaler = Rescaler(args.rescaler_bins, args.mlp_dropout, args.dark_hist_rate, args.do_rescale)
 		else:
 			self.rescaler = None
 
@@ -247,46 +255,25 @@ class ClsRegModel(nn.Module):
 		if self.rescaler is not None:
 			x, stretch, hv = self.rescaler(x)
 			hv = hv.view(-1, 1, 1, 1)
+		else:
+			stretch = torch.zeros(x.size(0), 1).to(x.device)
 
-		w_lg = F.sigmoid((x1 - hv) * self.sgm_scale)
-		totally_white = torch.ones_like(x1)
-		#print("Before feeding into module: ", w_lg.min(), w_lg.max())
-		with torch.no_grad():
-			w_sm = self.mask_extractor(w_lg)
-			totally_white = self.mask_extractor(totally_white)
-		#print(w_sm.shape)
-		w_sm = w_sm.view(w_sm.size(0), 1, self.pool_input_size, self.pool_input_size)
-		totally_white = totally_white.view(totally_white.size(0), 1, self.pool_input_size, self.pool_input_size)
-		#print(w_sm.shape, w_sm.mean().item(), w_sm.min().item(), w_sm.max().item())
-		#w_sm_wr = F.avg_pool2d(w_lg, self.pool_kernel)
+		if not self.dont_weighted_mask:
+			w_lg = F.sigmoid((x1 - hv) * self.sgm_scale)
+			totally_white = torch.ones_like(x1)
+			with torch.no_grad():
+				w_sm = self.mask_extractor(w_lg)
+				totally_white = self.mask_extractor(totally_white)
+			w_sm = w_sm.view(w_sm.size(0), 1, self.pool_input_size, self.pool_input_size)
+			totally_white = totally_white.view(totally_white.size(0), 1, self.pool_input_size, self.pool_input_size)
+			w_sm = w_sm / totally_white
+			mins, maxes = w_sm.min(-1, keepdim = True)[0].min(-2, keepdim = True)[0], w_sm.max(-1, keepdim = True)[0].max(-2, keepdim = True)[0]
+			w_sm = (w_sm - mins) / (maxes - mins)
+			w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
+		else:
+			w_sm = torch.ones(x.size(0), 1, self.pool_input_size, self.pool_input_size).to(x.device)
 
-		# Previous working version: uncomment this
-		#w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
-		w_sm_before = w_sm
-
-		#totally_white = totally_white / torch.sum(totally_white, dim = (1, 2, 3), keepdim = True)
-		w_sm = w_sm / totally_white
-		w_sm_before = w_sm
-		mins, maxes = w_sm.min(-1, keepdim = True)[0].min(-2, keepdim = True)[0], w_sm.max(-1, keepdim = True)[0].max(-2, keepdim = True)[0]
-		w_sm = (w_sm - mins) / (maxes - mins)
-		w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
-		w_sm = w_sm / torch.sum(w_sm, dim = (1, 2, 3), keepdim = True)
-		
-		#for _x1, _w_sm, _w_sm_wr in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(w_sm_wr)):
-		"""
-		for _x1, _w_sm, _w_sm_wr, _w_lg in zip(torch.unbind(x1), torch.unbind(w_sm), torch.unbind(totally_white), torch.unbind(w_sm_before)):
-			plt.subplot(2, 2, 1)
-			plt.imshow(_x1.detach().cpu().numpy().squeeze())
-			plt.subplot(2, 2, 2)
-			plt.imshow(_w_sm.detach().cpu().numpy().squeeze())
-			plt.subplot(2, 2, 3)
-			plt.imshow(_w_sm_wr.detach().cpu().numpy().squeeze())
-			plt.subplot(2, 2, 4)
-			plt.imshow(_w_lg.detach().cpu().numpy().squeeze())
-			plt.show()
-			#print(_w_sm.min().item(), _w_sm.max().item())		
-		#w_sm = w_sm - 
-		"""
+		w_sm = w_sm / torch.sum(w_sm, dim = (1, 2, 3), keepdim = True)	
 
 		if self.batch_norm is not None:
 			x = self.batch_norm(x)
@@ -393,7 +380,6 @@ def main():
 	optimiser = torch.optim.Adam(model.parameters(), lr = args.lr, amsgrad = args.amsgrad)
 	scheduler = torch.optim.lr_scheduler.StepLR(optimiser, args.step_lr_size)
 	max_acc = 0
-	torch.autograd.set_detect_anomaly(True)
 	for epoch in range(args.epochs):
 		st_time = time.time()
 		for phase, loader in [("train", train_loader), ("val", val_loader)]:
@@ -432,8 +418,7 @@ def main():
 			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}, reg L1 = {:.4f}, stre l1 = {:.2f}".format(epoch, phase, loss, acc, f1, l1, stre_l1), flush = True)
 			if phase == "val" and acc > max_acc:
 				max_acc, max_f1, max_l1, best_weights = acc, f1, l1, deepcopy(model.state_dict())
-				if max_acc > 0.65:
-					torch.save(best_weights, os.path.join(args.save_path, f"ckpt-{max_acc:.4f}.pt"))
+				torch.save(best_weights, os.path.join(args.save_path, f"ckpt-{max_acc:.4f}-{max_l1:.4f}.pt"))
 		print("Epoch time: {:.2f} mins".format((time.time() - st_time) / 60))
 		scheduler.step()
 	print("Max: ", max_acc, max_f1, max_l1)
