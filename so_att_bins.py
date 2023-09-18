@@ -225,7 +225,7 @@ class ClsRegModel(nn.Module):
 			self.batch_norm = None
 		if args.rescaler_bins > 0:
 			print("Using rescaler.")
-			self.rescaler = Rescaler(args.rescaler_bins, args.mlp_dropout, args.dark_hist_rate, args.do_rescale)
+			self.rescaler = Rescaler(args.rescaler_bins, args.mlp_dropout, args.dark_hist_rate, args.dont_rescale)
 		else:
 			self.rescaler = None
 
