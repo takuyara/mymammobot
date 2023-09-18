@@ -38,7 +38,7 @@ def get_args():
 	parser.add_argument("--binary", action = "store_true", default = False)
 	parser.add_argument("--cap", type = float, default = 100)
 	parser.add_argument("--target-size", type = int, default = 150)
-	parser.add_argument("--aug", action = "store_true", default = True)
+	parser.add_argument("--aug", action = "store_true", default = False)
 	parser.add_argument("--four-fold", action = "store_true", default = False)
 	parser.add_argument("--four-thres", type = float, default = 0.4)
 	parser.add_argument("--uses-bn", action = "store_true", default = False)
@@ -417,9 +417,10 @@ def main():
 			loss, acc, f1, l1 = sum_loss / num_loss, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro"), np.mean(np.abs(coord_trues - coord_preds))
 			stre_l1 = np.mean(np.abs(stretch_trues - stretch_preds))
 			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}, reg L1 = {:.4f}, stre l1 = {:.2f}".format(epoch, phase, loss, acc, f1, l1, stre_l1), flush = True)
-			if phase == "val" and acc > max_acc:
-				max_acc, max_f1, max_l1, best_weights = acc, f1, l1, deepcopy(model.state_dict())
-			torch.save(model.state_dict(), os.path.join(args.save_path, f"ckpt-{acc:.4f}-{l1:.4f}-{epoch}.pt"))
+			if phase == "val":
+				if acc > max_acc:
+					max_acc, max_f1, max_l1, best_weights = acc, f1, l1, deepcopy(model.state_dict())
+				torch.save(model.state_dict(), os.path.join(args.save_path, f"ckpt-{acc:.4f}-{l1:.4f}-{epoch}.pt"))
 		print("Epoch time: {:.2f} mins".format((time.time() - st_time) / 60))
 		scheduler.step()
 	print("Max: ", max_acc, max_f1, max_l1)
