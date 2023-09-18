@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 from utils.misc import randu_gen
 from models.model_utils import get_mlp
 from torchvision.models.resnet import Bottleneck
+from models.atloc import AtLoc
 
 import warnings
 warnings.filterwarnings("ignore")
