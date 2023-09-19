@@ -13,12 +13,14 @@ import matplotlib.pyplot as plt
 from utils.misc import randu_gen
 from models.model_utils import get_mlp
 from torchvision.models.resnet import Bottleneck
+from models.atloc import AtLoc
 
 import warnings
 warnings.filterwarnings("ignore")
 
-hidden_args = ["base_path", "val_path", "num_workers", "device", "n_channels", "epochs", "save_path", "binary", "cap", "target_size", "four_fold", "four_thres",
-	"uses_sigmoid", "reg_dims", "mlp_in_features", "inject_dropout", "normalise", "bins", "dark_thres", "sigmoid_scale", "pool_input_size", "pool_channels", "num_classes", "aug"]
+hidden_args = ["base_path", "val_path", "num_workers", "device", "n_channels", "epochs", "save_path", "binary", "four_fold", "four_thres",
+	"uses_sigmoid", "reg_dims", "mlp_in_features", "inject_dropout", "cls_neurons", "reg_neurons", "amsgrad", "normalise", "bins", "dark_thres",
+	"sigmoid_scale", "pool_input_size", "pool_channels", "num_classes", "resume", "border_padding", "relative_values", "stretch_loss_rate"]
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -39,6 +41,7 @@ def get_args():
 	parser.add_argument("--cap", type = float, default = 100)
 	parser.add_argument("--target-size", type = int, default = 150)
 	parser.add_argument("--aug", action = "store_true", default = False)
+	parser.add_argument("--aug-old", action = "store_true", default = False)
 	parser.add_argument("--four-fold", action = "store_true", default = False)
 	parser.add_argument("--four-thres", type = float, default = 0.4)
 	parser.add_argument("--uses-bn", action = "store_true", default = False)
@@ -61,6 +64,7 @@ def get_args():
 	parser.add_argument("--pool-channels", type = int, default = 2048)
 	parser.add_argument("--resume", type = str, default = None)
 	parser.add_argument("--adv-scale", type = float, default = 0)
+	# Normal adv scale 0.02
 	parser.add_argument("--dark-hist-rate", type = float, default = 0.2)
 	parser.add_argument("--border-padding", type = int, default = 0)
 	parser.add_argument("--relative-values", action = "store_true")
@@ -69,6 +73,8 @@ def get_args():
 	parser.add_argument("--mlp-dropout", type = float, default = 0.1)
 	parser.add_argument("--dont-rescale", action = "store_true")
 	parser.add_argument("--dont-weighted-mask", action = "store_true")
+	parser.add_argument("--da-type", type = str, default = "min-max")
+	parser.add_argument("--uses-atloc", action = "store_true")
 	return parser.parse_args()
 
 
@@ -84,7 +90,9 @@ def get_transform(training, args):
 	resize = transforms.Resize(args.target_size)
 	mask_resize = transforms.Resize(args.pool_input_size)
 	normalise = transforms.Normalize((0.1109, ), (0.1230, ))
+	jitter = transforms.ColorJitter(brightness = 0.5, contrast = 0.5, saturation = 0, hue = 0)
 	def fun(img):
+		input_img = img
 		img = torch.tensor(img).unsqueeze(0)
 		if training:
 			if args.aug:
@@ -99,12 +107,75 @@ def get_transform(training, args):
 			img = resize(img)
 		stretch = img.max() - img.min()
 		#print(stretch)
-		img = (img - img.min()) / stretch
+		if args.da_type == "min-max":
+			img = (img - img.min()) / stretch
+		elif args.da_type == "linear":
+			if training:
+				_w, _b = 0.13236457109451294, 2.5300467014312744
+				img = img * _w + _b
+		elif args.da_type == "quantile":
+			orig_shape = img.shape
+			q = torch.argsort(img.flatten())
+			q = torch.argsort(q) / torch.max(q)
+			img = q.view(orig_shape)
+		elif args.da_type == "hist_simple":
+			num_bins = 20
+			img = (img - img.min()) / stretch
+			img = torch.minimum(torch.floor(img * num_bins), torch.tensor(num_bins - 1)) / num_bins
+		elif args.da_type == "hist_complex":
+			num_bins = 20
+			orig_shape = img.shape
+			img = (img - img.min()) / stretch
+			img = img.numpy().squeeze()
+			img_hist_indices = np.minimum(np.floor(img * num_bins).astype(int), num_bins - 1)
+			img_hist_heights = np.histogram(img.ravel(), bins = num_bins, density = True)[0]
+			hist_peak_idx = np.argmax(img_hist_heights)
+			img_hist_heights = img_hist_heights / img_hist_heights[hist_peak_idx]
+			for j in range(len(img_hist_heights)):
+				i = len(img_hist_heights) - j - 1
+				if i < hist_peak_idx:
+					img_hist_heights[i] = 1
+				if j > 0:
+					img_hist_heights[i] = max(img_hist_heights[i], img_hist_heights[i + 1])
+			labels = 1.0 - img_hist_heights[img_hist_indices]
+			img = torch.tensor(labels.reshape(orig_shape))
+		else:
+			raise NotImplementedError
+
+		if args.adv_scale > 0:
+			#plt.subplot(1, 3, 1)
+			#plt.imshow(img.numpy().squeeze())
+			"""
+			t_hst = torch.histc(img.flatten(), bins = args.rescaler_bins, min = 0., max = 1.)
+			comp_height = torch.max(t_hst) * args.dark_hist_rate
+			comp_height_bin = torch.argmax(t_hst)
+			t_value = torch.argmin(torch.logical_or((torch.arange(args.rescaler_bins) < comp_height_bin), (t_hst > comp_height)).float()) / args.rescaler_bins
+			w = F.sigmoid((img - t_value) * args.sigmoid_scale)
+			noise = torch.randn_like(img) * (1 - w) * args.adv_scale
+			"""
+			noise = torch.randn_like(img) * (1 - img) * args.adv_scale
+			img = img + noise
+			"""
+			plt.subplot(1, 3, 2)
+			plt.imshow(img.numpy().squeeze())
+			plt.subplot(1, 3, 3)
+			plt.imshow(noise.numpy().squeeze())
+			plt.show()
+			"""
+		if args.aug_old:
+			img = jitter(img)
+
 		img = transforms.functional.pad(img, args.border_padding)
-		if args.bins > 0:
-			print("Using histogram to reduce noise.")
-			img = torch.minimum(torch.floor(img * args.bins), torch.tensor(args.bins - 1)) / args.bins
-		return img.repeat(args.n_channels, 1, 1), stretch
+
+		"""
+		plt.subplot(1, 2, 1)
+		plt.imshow(input_img)
+		plt.subplot(1, 2, 2)
+		plt.imshow(img.numpy().squeeze())
+		plt.show()
+		"""
+
+		return img.repeat(args.n_channels, 1, 1)
 	return fun
 
 class PreloadDataset(Dataset):
@@ -136,7 +207,7 @@ class PreloadDataset(Dataset):
 			plt.show()
 		"""
 
-		return *img, lb, reg
+		return img, lb, reg
 	def __len__(self):
 		return len(self.img_data)
 
@@ -165,7 +236,7 @@ class Rescaler(nn.Module):
 			out = x * w
 		else:
 			out = x
-		return out, w, value
+		return out, value
 
 class WeightedAvgPool(nn.Module):
 	def __init__(self, args):
@@ -190,13 +261,6 @@ class WeightedAvgPool(nn.Module):
 		#print("Weighted mean", x.mean().item())
 		x = torch.sum(x, dim = (2, 3), keepdim = True)
 		#print(x.shape)
-		return x
-
-class PlaceHolder(nn.Module):
-	def __init__(self):
-		super(PlaceHolder, self).__init__()
-	def forward(self, x):
-		print("Input Placeholder: ", x.shape)
 		return x
 
 class ClsRegModel(nn.Module):
@@ -253,10 +317,8 @@ class ClsRegModel(nn.Module):
 	def forward(self, x):
 		x1 = x
 		if self.rescaler is not None:
-			x, stretch, hv = self.rescaler(x)
+			x, hv = self.rescaler(x)
 			hv = hv.view(-1, 1, 1, 1)
-		else:
-			stretch = torch.zeros(x.size(0), 1).to(x.device)
 
 		if not self.dont_weighted_mask:
 			w_lg = F.sigmoid((x1 - hv) * self.sgm_scale)
@@ -287,7 +349,7 @@ class ClsRegModel(nn.Module):
 		x_reg = self.mlp_reg(x) if self.mlp_reg is not None else x
 		out_cls = self.out_cls(x_cls)
 		out_reg = self.out_reg(x_reg)
-		return out_cls, out_reg, stretch
+		return out_cls, out_reg
 
 def append_dropout(model, dropout):
 	for name, module in model.named_children():
@@ -355,11 +417,14 @@ def get_model(args):
 	mask_extractor = net_to_receptive_extractor(model)
 	#print(mask_extractor)
 
-	return ClsRegModel(model, mask_extractor, args)
+	if not args.uses_atloc:
+		return ClsRegModel(model, mask_extractor, args)
+	else:
+		return AtLoc(model, output_dim = args.num_classes, reg_dim = args.reg_dims, droprate=0.5, scale_num_bins = 0, batchnorm = False, custombn = False, pretrained=True, feat_dim=2048, n_channels = 1, lstm=False)
+
 
 def main():
 	args = get_args()
-	print(args)
 	for arg_name, arg_value in vars(args).items():
 		if arg_name not in hidden_args:
 			print(f"{arg_name}: {arg_value}")
@@ -374,6 +439,7 @@ def main():
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	model = get_model(args)
 	model = model.to(args.device)
+	print(model, flush = True)
 
 	if args.resume is not None:
 		print("Resuming from ", args.resume, flush = True)
@@ -390,14 +456,13 @@ def main():
 				model.eval()
 			y_true, y_pred = [], []
 			coord_trues, coord_preds = [], []
-			stretch_trues, stretch_preds = [], []
 			sum_loss = num_loss = 0
-			for imgs, stretches, labels, coords in loader:
+			for imgs, labels, coords in loader:
 				#print("Batch")
-				imgs, stretches, labels, coords = imgs.to(args.device).float(), stretches.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
+				imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
 				with torch.set_grad_enabled(phase == "train"):
-					logits, pred_coords, pred_stretches = model(imgs)
-					loss = nn.CrossEntropyLoss()(logits, labels) + args.reg_loss_rate * nn.MSELoss()(coords, pred_coords) + args.stretch_loss_rate * nn.MSELoss()(stretches, pred_stretches)
+					logits, pred_coords = model(imgs)
+					loss = nn.CrossEntropyLoss()(logits, labels) + args.reg_loss_rate * nn.MSELoss()(coords, pred_coords)
 				if phase == "train":
 					optimiser.zero_grad()
 					loss.backward()
@@ -409,14 +474,10 @@ def main():
 				y_pred.append(preds.cpu().numpy())
 				coord_trues.append(coords.cpu().numpy())
 				coord_preds.append(pred_coords.detach().cpu().numpy())
-				stretch_trues.append(stretches.cpu().numpy())
-				stretch_preds.append(pred_stretches.detach().cpu().numpy())
 			y_true, y_pred = np.concatenate(y_true, axis = 0), np.concatenate(y_pred, axis = 0)
 			coord_trues, coord_preds = np.concatenate(coord_trues, axis = 0), np.concatenate(coord_preds, axis = 0)
-			stretch_trues, stretch_preds = np.concatenate(stretch_trues, axis = 0), np.concatenate(stretch_preds, axis = 0)
 			loss, acc, f1, l1 = sum_loss / num_loss, accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro"), np.mean(np.abs(coord_trues - coord_preds))
-			stre_l1 = np.mean(np.abs(stretch_trues - stretch_preds))
-			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}, reg L1 = {:.4f}, stre l1 = {:.2f}".format(epoch, phase, loss, acc, f1, l1, stre_l1), flush = True)
+			print("Epoch {} phase {}: loss = {:.4f}, accuracy = {:.4f}, f1 = {:.4f}, reg L1 = {:.4f}".format(epoch, phase, loss, acc, f1, l1), flush = True)
 			if phase == "val":
 				if acc > max_acc:
 					max_acc, max_f1, max_l1, best_weights = acc, f1, l1, deepcopy(model.state_dict())
