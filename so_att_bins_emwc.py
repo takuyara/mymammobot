@@ -200,6 +200,7 @@ class PreloadDataset(Dataset):
 	def __getitem__(self, idx):
 		lb = int(self.label_data[idx, 0])
 		reg = self.label_data[idx, 4 : 7]
+		reg = (reg - np.array([-19.64679415, -3.78229908, -158.27491891])) / np.array([31.8304822, 25.39679095, 6.02799436])
 		img = self.transform(self.img_data[idx, ...])
 		if self.four_fold:
 			if lb == 0 and self.label_data[idx, 1] > self.four_thres:
