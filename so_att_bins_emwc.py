@@ -473,7 +473,6 @@ def main():
 				with torch.set_grad_enabled(phase == "train"):
 					logits, pred_coords = model(imgs)
 					loss = nn.MSELoss()(coords, pred_coords)
-				print(pred_coords.shape, coords.shape)
 				if phase == "train":
 					optimiser.zero_grad()
 					loss.backward()

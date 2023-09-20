@@ -116,10 +116,10 @@ def main():
 	model.eval()
 
 	print("Val confirmed:")
-	#print(outit(get_serial("val", model, args)))
+	print(outit(get_serial("val", model, args)))
 
 	print("Val all:")
-	#print(outit(get_serial("val_all", model, args)))
+	print(outit(get_serial("val_all", model, args)))
 
 	ds = []
 	#print("Val REAL-0")
