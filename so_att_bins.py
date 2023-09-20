@@ -22,7 +22,7 @@ hidden_args = ["base_path", "val_path", "num_workers", "device", "n_channels", "
 	"uses_sigmoid", "reg_dims", "mlp_in_features", "inject_dropout", "cls_neurons", "reg_neurons", "amsgrad", "normalise", "bins", "dark_thres",
 	"sigmoid_scale", "pool_input_size", "pool_channels", "num_classes", "resume", "border_padding", "relative_values", "stretch_loss_rate"]
 
-def get_args():
+def get_parser():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--base-path", type = str, default = "./")
 	parser.add_argument("--train-path", type = str, default = "train")
@@ -75,10 +75,12 @@ def get_args():
 	parser.add_argument("--dont-weighted-mask", action = "store_true")
 	parser.add_argument("--da-type", type = str, default = "min-max")
 	parser.add_argument("--uses-atloc", action = "store_true")
+	return parser
+
+def get_args():
+	parser = get_parser()
 	return parser.parse_args()
 
-
-max_hists = [[], [], []]
 
 def get_transform(training, args):
 	blur = transforms.GaussianBlur(21, 7)
@@ -95,9 +97,9 @@ def get_transform(training, args):
 		input_img = img
 		img = torch.tensor(img).unsqueeze(0)
 		if training:
+			img = torch.minimum(img, torch.tensor(args.cap))
 			if args.aug:
 				img = blur(img)
-				img = torch.minimum(img, torch.tensor(args.cap))
 				img = elastic(img)
 				img = persp(img)
 				img = crop_train(img)
@@ -175,7 +177,7 @@ def get_transform(training, args):
 		plt.show()
 		"""
 
-		return img.repeat(args.n_channels, 1, 1)
+		return img
 	return fun
 
 class PreloadDataset(Dataset):
@@ -212,20 +214,21 @@ class PreloadDataset(Dataset):
 		return len(self.img_data)
 
 class Rescaler(nn.Module):
-	def __init__(self, bins, dropout, height_rate, dont_rescale):
+	def __init__(self, bins, dropout, height_rate, dont_rescale, v_range):
 		super(Rescaler, self).__init__()
 		self.mlp = get_mlp(bins, [32, 64, 128, 1], dropout)[0]
 		self.bins = bins
 		self.height_rate = height_rate
 		self.dont_rescale = dont_rescale
+		self.v_range = v_range
 	def forward(self, x):
 		hst = []
 		value = []
 		for tx in torch.unbind(x):
-			t_hst = torch.histc(tx.flatten(), bins = self.bins, min = 0., max = 1.)
+			t_hst = torch.histc(tx.flatten(), bins = self.bins, min = 0., max = self.v_range)
 			comp_height = torch.max(t_hst) * self.height_rate
 			comp_height_bin = torch.argmax(t_hst)
-			t_value = torch.argmin(torch.logical_or((torch.arange(self.bins).to(t_hst.device) < comp_height_bin), (t_hst > comp_height)).float()) / self.bins
+			t_value = torch.argmin(torch.logical_or((torch.arange(self.bins).to(t_hst.device) < comp_height_bin), (t_hst > comp_height)).float()) / self.bins * self.v_range
 			#print(t_hst, t_value)
 			hst.append(t_hst)
 			value.append(t_value)
@@ -280,6 +283,7 @@ class ClsRegModel(nn.Module):
 		self.border_padding = args.border_padding
 		self.dont_rescale = args.dont_rescale
 		self.dont_weighted_mask = args.dont_weighted_mask
+		self.n_channels = args.n_channels
 
 		self.dark_thres = args.dark_thres
 		self.base = base
@@ -287,9 +291,10 @@ class ClsRegModel(nn.Module):
 			self.batch_norm = nn.BatchNorm2d(args.n_channels)
 		else:
 			self.batch_norm = None
+		self.v_range = 100.0 if args.da_type == "linear" else 1.0
 		if args.rescaler_bins > 0:
 			print("Using rescaler.")
-			self.rescaler = Rescaler(args.rescaler_bins, args.mlp_dropout, args.dark_hist_rate, args.dont_rescale)
+			self.rescaler = Rescaler(args.rescaler_bins, args.mlp_dropout, args.dark_hist_rate, args.dont_rescale, self.v_range)
 		else:
 			self.rescaler = None
 
@@ -321,7 +326,7 @@ class ClsRegModel(nn.Module):
 			hv = hv.view(-1, 1, 1, 1)
 
 		if not self.dont_weighted_mask:
-			w_lg = F.sigmoid((x1 - hv) * self.sgm_scale)
+			w_lg = F.sigmoid(((x1 - hv) / self.v_range) * self.sgm_scale)
 			totally_white = torch.ones_like(x1)
 			with torch.no_grad():
 				w_sm = self.mask_extractor(w_lg)
@@ -335,11 +340,11 @@ class ClsRegModel(nn.Module):
 		else:
 			w_sm = torch.ones(x.size(0), 1, self.pool_input_size, self.pool_input_size).to(x.device)
 
-		w_sm = w_sm / torch.sum(w_sm, dim = (1, 2, 3), keepdim = True)	
+		w_sm = w_sm / torch.sum(w_sm, dim = (1, 2, 3), keepdim = True)
 
 		if self.batch_norm is not None:
 			x = self.batch_norm(x)
-		x = self.base(x)
+		x = self.base(x.repeat(1, self.n_channels, 1, 1))
 		#print("Forward: ", x.shape)
 		x = self.base_pool(x, w_sm)
 		#print(x.shape)
@@ -407,6 +412,8 @@ def get_model(args):
 
 		if args.n_channels != 3:
 			model.conv1 = nn.Conv2d(args.n_channels, 64, kernel_size = 7, stride = 2, padding = 3, bias = False)
+		else:
+			print("Not replacing the first layer.")
 		if args.inject_dropout:
 			append_dropout(model, args.dropout)
 			#print(model)

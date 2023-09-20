@@ -267,13 +267,39 @@ class ClsRegModel(nn.Module):
 			w_sm = w_sm.view(w_sm.size(0), 1, self.pool_input_size, self.pool_input_size)
 			totally_white = totally_white.view(totally_white.size(0), 1, self.pool_input_size, self.pool_input_size)
 			w_sm = w_sm / totally_white
+			rela_weights = w_sm
 			mins, maxes = w_sm.min(-1, keepdim = True)[0].min(-2, keepdim = True)[0], w_sm.max(-1, keepdim = True)[0].max(-2, keepdim = True)[0]
 			w_sm = (w_sm - mins) / (maxes - mins)
+			w_sm_before = w_sm
 			w_sm = (torch.tensor(1.) - w_sm) + (torch.tensor(1.) + torch.exp(self.light_weight)) * w_sm
+
+			
+			light_weight_1 = torch.tensor(0.)
+			w_sm_2 = (torch.tensor(1.) - w_sm_before) + (torch.tensor(1.) + torch.exp(light_weight_1)) * w_sm_before
+			w_sm = w_sm / torch.sum(w_sm, dim = (1, 2, 3), keepdim = True)
+			w_sm_2 = w_sm_2 / torch.sum(w_sm_2, dim = (1, 2, 3), keepdim = True)
+			w_sm_0 = w_sm_before / torch.sum(w_sm_before, dim = (1, 2, 3), keepdim = True)
+			for img, t_msk, t_white, t_rela, t_final_0, t_final_2, t_final_7 in zip(torch.unbind(x1), torch.unbind(w_lg), torch.unbind(totally_white), torch.unbind(rela_weights), torch.unbind(w_sm_0), torch.unbind(w_sm_2), torch.unbind(w_sm)):
+				fig, axes = plt.subplots(2, 3)
+				axes = axes.ravel()
+				for i, dt in enumerate([img, t_msk, t_white, t_rela, t_final_2, t_final_7]):
+					dt = dt.cpu().numpy().squeeze()
+					axes[i].imshow(dt)
+					axes[i].axis("off")
+					if i > 1:
+						for x in range(5):
+							for y in range(5):
+								if i > 3:
+									c = "{:.3f}".format(dt[y, x] * 100)
+								else:
+									c = "{:.3f}".format(dt[y, x])
+								axes[i].text(x, y, c, va = "center", ha = "center", color = "red", fontsize = 15)
+				plt.show()
+
 		else:
 			w_sm = torch.ones(x.size(0), 1, self.pool_input_size, self.pool_input_size).to(x.device)
 
-		w_sm = w_sm / torch.sum(w_sm, dim = (1, 2, 3), keepdim = True)	
+		w_sm = w_sm / torch.sum(w_sm, dim = (1, 2, 3), keepdim = True)
 
 		if self.batch_norm is not None:
 			x = self.batch_norm(x)

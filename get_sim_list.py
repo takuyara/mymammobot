@@ -948,6 +948,51 @@ def plot_sfs_vs_mesh_out():
 			plt.clf()
 
 
+def plot_sfs_vs_mesh_histogram():
+	out_path = "./depth-images/fix-final-sfs-vs-mesh-histogram"
+	os.makedirs(out_path, exist_ok = True)
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
+	blur = transforms.GaussianBlur(21, 7)
+	chosen_data = [(0, 52), (0, 92), (1, 182), (1, 1044), (2, 1336), (2, 1838)]
+
+
+	plt.figure(figsize = (9, 5))
+	plt.subplots_adjust(left = 0.05, right = 0.99, top = 0.99, bottom = 0.3, hspace = 0.05, wspace = 0.16)
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			plt.clf()
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			if (em_idx, img_idx) not in chosen_data:
+				continue
+			position, orientation, up = str_to_arr(row["position"]), str_to_arr(row["orientation"]), str_to_arr(row["up"])
+			dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+			rgb_gt, dep_gt = get_depth_map(p, position, orientation, up, get_outputs = True)
+			
+			rgb_rc = cv2.imread(os.path.join(em_base_path, f"EM-RGB-{em_idx}", f"{img_idx}.png"), cv2.IMREAD_GRAYSCALE)
+			rgb_rc = rgb_rc[9 : 255, ...]
+			rgb_rc = cv2.resize(rgb_rc, (224, 224)) / 255.0
+
+			dep_gt_aligned = torch.minimum(torch.tensor(dep_gt).unsqueeze(0), torch.tensor(100.0))
+			dep_gt_aligned = blur(dep_gt_aligned).numpy().squeeze()
+			dep_gt_aligned = (dep_gt_aligned - dep_gt_aligned.min()) / (dep_gt_aligned.max() - dep_gt_aligned.min())
+			dep_rc_aligned = (dep_rc - dep_rc.min()) / (dep_rc.max() - dep_rc.min())
+
+			num_plots = 1, 2
+			for i, (tv, out_title) in enumerate([(dep_rc_aligned, "DM-SFS-Aligned"), (dep_gt_aligned, "DM-Mesh-Aligned")]):
+				plt.subplot(*num_plots, i + 1)
+				plt.hist(tv.ravel(), bins = 20, range = (0, 1), density = True)
+				plt.xlabel("Aliged DM Value", fontsize = 15, y = 1)
+				plt.ylabel("Density", fontsize = 15)
+				plt.title(out_title, fontsize = 25, y = -0.35)
+
+			#plt.show()
+			plt.savefig(os.path.join(out_path, f"{em_idx}-{img_idx:04d}.png"))
+
+			plt.clf()
+
+
 
 def plot_sfs_vs_mesh():
 	out_path = "./depth-images/fix-final-sfs-vs-mesh-out"
@@ -1094,4 +1139,6 @@ if __name__ == '__main__':
 	#plot_sfs_out_img()
 	#sfs_distrib_summ()
 	#plot_scaled_contours()
-	plot_sfs_vs_mesh_range()
+	
+	#plot_sfs_vs_mesh_range()
+	plot_sfs_vs_mesh_histogram()
