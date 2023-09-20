@@ -47,7 +47,7 @@ def get_yt_yp_list(args, val_path, model):
 	print("FPS {:.4f}".format(len(y_true) / (time.time() - st_time)))
 	return y_true, y_pred, coord_trues, coord_preds
 
-def smoothing(y_pred, coord_preds, window_size = 5, momenteum = 0.2):
+def smoothing(y_pred, coord_preds, window_size = 25, momenteum = 0.8):
 	prev_labels = [0] * window_size
 	axial_len = 0
 	prev_pred_label = 0
