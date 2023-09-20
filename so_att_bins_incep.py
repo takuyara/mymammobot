@@ -76,10 +76,6 @@ def get_parser():
 	parser.add_argument("--da-type", type = str, default = "min-max")
 	parser.add_argument("--uses-atloc", action = "store_true")
 	parser.add_argument("--val-blur", action = "store_true")
-	parser.add_argument("--hide-blurring", action = "store_true")
-	parser.add_argument("--hide-elastic", action = "store_true")
-	parser.add_argument("--hide-persp", action = "store_true")
-	parser.add_argument("--hide-crop", action = "store_true")
 	return parser
 
 def get_args():
@@ -104,16 +100,10 @@ def get_transform(training, args):
 		if training:
 			if args.aug:
 				img = torch.minimum(img, torch.tensor(args.cap))
-				if not args.hide_blurring:
-					img = blur(img)
-				if not args.hide_elastic:
-					img = elastic(img)
-				if not args.hide_persp:
-					img = persp(img)
-				if not args.hide_crop:
-					img = crop_train(img)
-				else:
-					img = resize(img)
+				img = blur(img)
+				img = elastic(img)
+				img = persp(img)
+				img = crop_train(img)
 			else:
 				if args.val_blur:
 					img = blur(img)
@@ -342,10 +332,10 @@ class ClsRegModel(nn.Module):
 			w_lg = F.sigmoid(((x1 - hv) / self.v_range) * self.sgm_scale)
 			totally_white = torch.ones_like(x1)
 			with torch.no_grad():
-				w_sm = self.mask_extractor(w_lg)
-				totally_white = self.mask_extractor(totally_white)
-			w_sm = w_sm.view(w_sm.size(0), 1, self.pool_input_size, self.pool_input_size)
-			totally_white = totally_white.view(totally_white.size(0), 1, self.pool_input_size, self.pool_input_size)
+				w_sm = self.mask_extractor(w_lg)[0]
+				totally_white = self.mask_extractor(totally_white)[0]
+			w_sm = w_sm.view(w_sm.size(0), -1, self.pool_input_size, self.pool_input_size)[ : , 0 : 1, ...]
+			totally_white = totally_white.view(totally_white.size(0), -1, self.pool_input_size, self.pool_input_size)[ : , 0 : 1, ...]
 			w_sm = w_sm / totally_white
 			mins, maxes = w_sm.min(-1, keepdim = True)[0].min(-2, keepdim = True)[0], w_sm.max(-1, keepdim = True)[0].max(-2, keepdim = True)[0]
 			w_sm = (w_sm - mins) / (maxes - mins)
@@ -357,7 +347,7 @@ class ClsRegModel(nn.Module):
 
 		if self.batch_norm is not None:
 			x = self.batch_norm(x)
-		x = self.base(x.repeat(1, self.n_channels, 1, 1))
+		x = self.base(x.repeat(1, self.n_channels, 1, 1))[0]
 		#print("Forward: ", x.shape)
 		x = self.base_pool(x, w_sm)
 		#print(x.shape)
@@ -403,10 +393,31 @@ def change_n_channels(model):
 			new_module = nn.Sequential(module, HalfingLayer())
 			setattr(model, name, new_module)
 
+def change_n_channels_inception(model):
+	for name, module in model.named_children():
+		if len(list(module.children())) > 0:
+			change_n_channels_inception(module)
+		if isinstance(module, nn.Conv2d):
+			kernel_size = module.kernel_size
+			sum_field = kernel_size[0] * kernel_size[1] * module.out_channels
+			new_module = nn.Conv2d(module.in_channels, module.out_channels, kernel_size = kernel_size, stride = module.stride, padding = module.padding, groups = module.groups, bias = False, dilation = module.dilation)
+			new_module.weight = nn.Parameter(torch.ones_like(new_module.weight) / sum_field, requires_grad = False)
+			setattr(model, name, new_module)
+		elif isinstance(module, nn.BatchNorm2d):
+			new_module = nn.Identity()
+			setattr(model, name, new_module)
+
+
 def net_to_receptive_extractor(model):
 	model = deepcopy(model)
 	change_n_channels(model)
 	return model
+
+def net_to_receptive_extractor_inception(model):
+	model = deepcopy(model)
+	change_n_channels_inception(model)
+	return model
+
 
 def get_model(args):
 	if args.model_type.find("resnet") != -1:
@@ -430,11 +441,18 @@ def get_model(args):
 		if args.inject_dropout:
 			append_dropout(model, args.dropout)
 			#print(model)
+		mask_extractor = net_to_receptive_extractor(model)
+	elif args.model_type.find("inception") != -1:
+		model = models.inception_v3(weights = models.Inception_V3_Weights.DEFAULT, transform_input = False)
+		if args.n_channels != 3:
+			model.Conv2d_1a_3x3.conv = nn.Conv2d(1, 32, kernel_size = 3, stride = 2, bias = False)
+		model.dropout = nn.Identity()
+		mask_extractor = net_to_receptive_extractor_inception(model)
 	else:
 		model = models.swin_v2_t(weights = models.Swin_V2_T_Weights.DEFAULT, dropout = args.dropout)
 		if args.n_channels != 3:
 			model.features[0][0] = nn.Conv2d(args.n_channels, 96, kernel_size = 4, stride = 4)
-	mask_extractor = net_to_receptive_extractor(model)
+	
 	#print(mask_extractor)
 
 	if not args.uses_atloc:
