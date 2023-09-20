@@ -24,8 +24,8 @@ def get_data(paths, prefix):
 	np.save(f"{prefix}_label.npy", label_list)
 
 #get_data(["virtual_dataset/full/train"], "train")
-#get_data(["real_dataset/confirmed/real-0", "real_dataset/confirmed/real-1", "real_dataset/confirmed/real-2"], "val_nag")
+#get_data(["real_dataset/confirmed/real-0", "real_dataset/confirmed/real-1", "real_dataset/confirmed/real-2"], "val")
 get_data(["real_dataset/all/real-0", "real_dataset/all/real-1", "real_dataset/all/real-2"], "val_all")
-#get_data(["real_dataset/all/real-0"], "val_all_nag_0")
-#get_data(["real_dataset/all/real-1"], "val_all_nag_1")
-#get_data(["real_dataset/all/real-2"], "val_all_nag_2")
+get_data(["real_dataset/all/real-0"], "val_all_0")
+get_data(["real_dataset/all/real-1"], "val_all_1")
+get_data(["real_dataset/all/real-2"], "val_all_2")

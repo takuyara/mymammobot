@@ -15,7 +15,7 @@ from utils.misc import str_to_arr
 from ds_gen.depth_map_generation import get_depth_map
 
 from utils.stats import get_num_bins
-from pose_fixing.similarity import kl_sim, corr_sim, mi_sim, comb_corr_sim, dark_threshold_v, dark_threshold_r, cache_base_data, contour_sim, draw_contours, cache_multiscale_base_data
+from pose_fixing.similarity import kl_sim, corr_sim, mi_sim, comb_corr_sim, dark_threshold_v, dark_threshold_r, cache_base_data, contour_sim, draw_contours, cache_multiscale_base_data, multiscale_contour_corr_sim
 #from domain_transfer.alignment import reg_depth_maps
 
 em_base_path = "./depth-images/"
@@ -1077,6 +1077,91 @@ def plot_sfs_vs_mesh_range():
 	plt.show()
 
 
+
+
+
+def plot_fixing_results():
+	p = pv.Plotter(off_screen = True, window_size = (224, 224))
+	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
+
+	confirmed_hcd, confirmed_wc = [], []
+	all_hcd, all_wc = [], []
+	confirmed_hcd_diff, confirmed_wc_diff = [], []
+	all_hcd_diff, all_wc_diff = [], []
+	oob_hcd, oob_wc = [], []
+	all_oob_cnt = confirmed_oob_cnt = 0
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			#position, orientation, up = str_to_arr(row["position"]), str_to_arr(row["orientation"]), str_to_arr(row["up"])
+			#dep_rc = np.load(os.path.join(em_base_path, f"EM-rawdep-{em_idx}", f"{img_idx:06d}.npy"))
+			#dep_gt = get_depth_map(p, position, orientation, up)
+
+			#dep_em = np.load(os.path.join(em_base_path, f"EM-virtual-RF-{em_idx}", f"{img_idx:06d}.npy"))
+			rgb_em = cv2.imread(os.path.join(em_base_path, f"EM-virtual-RF-{em_idx}", f"{img_idx:06d}.png"))
+			if np.min(rgb_em, axis = -1).max() == 255:
+				if human_eval == 1:
+					confirmed_oob_cnt += 1
+				all_oob_cnt += 1
+			
+			continue
+
+
+
+
+			
+			scale_rates = [0.1, 0.25, 0.4]
+			rc_contour_list, quantile_list, rc_light_mask_list = cache_multiscale_base_data(dep_rc, scale_rates = scale_rates)
+			dt = multiscale_contour_corr_sim(dep_gt, dep_rc, rc_contour_list, quantile_list, rc_light_mask_list)
+			if dt is None:
+				print("Fuck GT None?")
+				continue
+			hcd_gt, wc_gt = dt
+			if np.min(rgb_em, axis = -1).max() == 255:
+				oob_hcd.append(hcd_gt)
+				oob_wc.append(wc_gt)
+			else:
+				dt = multiscale_contour_corr_sim(dep_em, dep_rc, rc_contour_list, quantile_list, rc_light_mask_list)
+				if dt is None:
+					print("Fuck EM None?")
+					continue
+				hcd_em, wc_em = dt
+				all_hcd_diff.append(hcd_gt - hcd_em)
+				all_wc_diff.append(wc_gt - wc_em)
+				if human_eval == 1:
+					confirmed_hcd_diff.append(hcd_gt - hcd_em)
+					confirmed_wc_diff.append(wc_gt - wc_em)
+			all_hcd.append(hcd_gt)
+			all_wc.append(wc_gt)
+			if human_eval == 1:
+				confirmed_hcd.append(hcd_gt)
+				confirmed_wc.append(wc_gt)
+
+	print(all_oob_cnt, confirmed_oob_cnt)
+	exit()
+
+	np.save("confirmed_hcd.npy", np.array(confirmed_hcd))
+	np.save("confirmed_wc.npy", np.array(confirmed_wc))
+	np.save("all_hcd.npy", np.array(all_hcd))
+	np.save("all_wc.npy", np.array(all_wc))
+	np.save("confirmed_hcd_diff.npy", np.array(confirmed_hcd_diff))
+	np.save("confirmed_wc_diff.npy", np.array(confirmed_wc_diff))
+	np.save("all_hcd_diff.npy", np.array(all_hcd_diff))
+	np.save("all_wc_diff.npy", np.array(all_wc_diff))
+	np.save("oob_hcd.npy", np.array(oob_hcd))
+	np.save("oob_wc.npy", np.array(oob_wc))
+	
+
+def show_fix_results():
+	pathes = ["confirmed_hcd.npy", "confirmed_wc.npy", "all_hcd.npy", "all_wc.npy", "confirmed_hcd_diff.npy", "confirmed_wc_diff.npy", "all_hcd_diff.npy", "all_wc_diff.npy", "oob_hcd.npy", "oob_wc.npy"]
+
+	for path in pathes:
+		d = np.load(path)
+		print(path.replace(".npy", ""), round(np.mean(d), 4), round(np.std(d), 4), len(d))
+
+
+
 if __name__ == '__main__':
 	#plt.figure(figsize = (20, 15))
 	#write_sim_list()
@@ -1141,4 +1226,6 @@ if __name__ == '__main__':
 	#plot_scaled_contours()
 	
 	#plot_sfs_vs_mesh_range()
-	plot_sfs_vs_mesh_histogram()
+	#plot_sfs_vs_mesh_histogram()
+	plot_fixing_results()
+	#show_fix_results()

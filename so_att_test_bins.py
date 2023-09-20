@@ -31,6 +31,7 @@ def get_yt_yp_list(args, val_path, model):
 	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
 	y_true, y_pred = [], []
 	coord_trues, coord_preds = [], []
+	st_time = time.time()
 	for imgs, labels, coords in val_loader:
 		imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
 		with torch.no_grad():
@@ -43,9 +44,10 @@ def get_yt_yp_list(args, val_path, model):
 			coord_preds.append(pred_coords.detach().cpu().numpy())
 	y_true, y_pred = np.concatenate(y_true, axis = 0), np.concatenate(y_pred, axis = 0)
 	coord_trues, coord_preds = np.concatenate(coord_trues, axis = 0), np.concatenate(coord_preds, axis = 0)
+	print("FPS {:.4f}".format(len(y_true) / (time.time() - st_time)))
 	return y_true, y_pred, coord_trues, coord_preds
 
-def smoothing(y_pred, coord_preds, window_size = 25, momenteum = 0.8):
+def smoothing(y_pred, coord_preds, window_size = 5, momenteum = 0.2):
 	prev_labels = [0] * window_size
 	axial_len = 0
 	prev_pred_label = 0
@@ -73,12 +75,14 @@ def smoothing(y_pred, coord_preds, window_size = 25, momenteum = 0.8):
 		prev_pred_label = cur_label
 		adjusted_pred_labels.append(cur_label)
 		adjusted_pred_axials.append(axial_len)
-	return adjusted_pred_labels, adjusted_pred_axials
+	return np.array(adjusted_pred_labels), np.array(adjusted_pred_axials)
 
 def get_metrics(y_true, y_pred, coord_trues, coord_preds):
 	acc, f1, l1 = accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro"), np.mean(np.abs(coord_trues - coord_preds))
 	conf = confusion_matrix(y_true, y_pred)
-	return {"acc": acc, "f1": f1, "l1": l1, "confusion": conf}
+	pcc = np.corrcoef(coord_trues.ravel(), coord_preds.ravel())[1][0]
+	l1_std = np.std(np.abs(coord_trues - coord_preds).ravel())
+	return {"acc": acc, "f1": f1, "l1": l1, "confusion": conf, "pcc": pcc, "l1_std": l1_std}
 
 def get_serial(val_path, model, args, smooth = False):
 	y_true, y_pred, coord_trues, coord_preds = get_yt_yp_list(args, val_path, model)
@@ -89,10 +93,10 @@ def get_serial(val_path, model, args, smooth = False):
 		return get_metrics(y_true, y_pred, coord_trues, coord_preds)
 
 def outit(dct):
-	return "Acc: {:.2f}, F1: {:.2f}, L1: {:.2f}".format(dct["acc"] * 100, dct["f1"] * 100, dct["l1"] * 100)
+	return "Acc: {:.2f}, F1: {:.2f}, L1: ({:.2f},{:.2f}), PCC: {:.4f}".format(dct["acc"] * 100, dct["f1"] * 100, dct["l1"] * 100, dct["l1_std"] * 100, dct["pcc"])
 
 def merge_multi(outs):
-	return {k : (sum([o[k] for o in outs]) / (3 if k != "confusion" else 1)) for k in ["acc", "f1", "l1", "confusion"]}
+	return {k : (sum([o[k] for o in outs]) / (3 if k != "confusion" else 1)) for k in ["acc", "f1", "l1", "confusion", "l1_std", "pcc"]}
 
 def main():
 	args = get_args()
@@ -112,10 +116,10 @@ def main():
 	model.eval()
 
 	print("Val confirmed:")
-	print(outit(get_serial("val", model, args)))
+	#print(outit(get_serial("val", model, args)))
 
 	print("Val all:")
-	print(outit(get_serial("val_all", model, args)))
+	#print(outit(get_serial("val_all", model, args)))
 
 	ds = []
 	#print("Val REAL-0")
