@@ -75,6 +75,7 @@ def get_parser():
 	parser.add_argument("--dont-weighted-mask", action = "store_true")
 	parser.add_argument("--da-type", type = str, default = "min-max")
 	parser.add_argument("--uses-atloc", action = "store_true")
+	parser.add_argument("--val-blur", action = "store_true")
 	return parser
 
 def get_args():
@@ -104,6 +105,8 @@ def get_transform(training, args):
 				img = persp(img)
 				img = crop_train(img)
 			else:
+				if args.val_blur:
+					img = blur(img)
 				img = resize(img)
 		else:
 			img = resize(img)

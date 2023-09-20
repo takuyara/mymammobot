@@ -26,25 +26,112 @@ def get_args():
 	parser.add_argument("--ckpt-path", type = str, default = "")
 	return parser.parse_args()
 
-def get_yt_yp_list(args, val_path):
-	return PreloadDataset(os.path.join(args.base_path, f"{val_path}_img.npy"), os.path.join(args.base_path, f"{val_path}_label.npy"), get_transform(False, args), args)
+def get_yt_yp_list(args, val_path, model):
+	val_set = PreloadDataset(os.path.join(args.base_path, f"{val_path}_img.npy"), os.path.join(args.base_path, f"{val_path}_label.npy"), get_transform(False, args), args)
+	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
+	y_true, y_pred = [], []
+	coord_trues, coord_preds = [], []
+	for imgs, labels, coords in val_loader:
+		imgs, labels, coords = imgs.to(args.device).float(), labels.to(args.device).long(), coords.to(args.device).float()
+		with torch.no_grad():
+			logits, pred_coords = model(imgs)
+			probs = torch.softmax(logits, dim = -1)
+			preds = torch.argmax(logits, dim = -1)
+			y_true.append(labels.cpu().numpy())
+			y_pred.append(preds.cpu().numpy())
+			coord_trues.append(coords.cpu().numpy())
+			coord_preds.append(pred_coords.detach().cpu().numpy())
+	y_true, y_pred = np.concatenate(y_true, axis = 0), np.concatenate(y_pred, axis = 0)
+	coord_trues, coord_preds = np.concatenate(coord_trues, axis = 0), np.concatenate(coord_preds, axis = 0)
+	return y_true, y_pred, coord_trues, coord_preds
+
+def smoothing(y_pred, coord_preds, window_size = 25, momenteum = 0.8):
+	prev_labels = [0] * window_size
+	axial_len = 0
+	prev_pred_label = 0
+
+	switch_from_axial = {0: 1, 1: 0, 2: 0}
+
+	adjusted_pred_axials, adjusted_pred_labels = [], []
+
+	for pred_label, pred_axial in zip(y_pred, coord_preds):
+		prev_labels.append(pred_label)
+		if len(prev_labels) > window_size:
+			prev_labels.pop(0)
+		values, counts = np.unique(prev_labels, return_counts = True)
+		cur_label = values[np.argmax(counts)]
+		strength = np.max(counts) / len(prev_labels)
+
+		if cur_label != prev_pred_label:
+			if strength > 0.7 or (abs(switch_from_axial[prev_pred_label] - axial_len) < 0.2):
+				pass
+			else:
+				cur_label = prev_pred_label
+			axial_len = pred_axial
+		
+		axial_len = momenteum * axial_len + (1 - momenteum) * pred_axial
+		prev_pred_label = cur_label
+		adjusted_pred_labels.append(cur_label)
+		adjusted_pred_axials.append(axial_len)
+	return adjusted_pred_labels, adjusted_pred_axials
+
+def get_metrics(y_true, y_pred, coord_trues, coord_preds):
+	acc, f1, l1 = accuracy_score(y_true, y_pred), f1_score(y_true, y_pred, average = "macro"), np.mean(np.abs(coord_trues - coord_preds))
+	conf = confusion_matrix(y_true, y_pred)
+	return {"acc": acc, "f1": f1, "l1": l1, "confusion": conf}
+
+def get_serial(val_path, model, args, smooth = False):
+	y_true, y_pred, coord_trues, coord_preds = get_yt_yp_list(args, val_path, model)
+	if smooth:
+		a_labels, a_axials = smoothing(y_pred, coord_preds)
+		return get_metrics(y_true, y_pred, coord_trues, coord_preds), get_metrics(y_true, a_labels, coord_trues, a_axials)
+	else:
+		return get_metrics(y_true, y_pred, coord_trues, coord_preds)
+
+def outit(dct):
+	return "Acc: {:.2f}, F1: {:.2f}, L1: {:.2f}".format(dct["acc"] * 100, dct["f1"] * 100, dct["l1"] * 100)
+
+def merge_multi(outs):
+	return {k : (sum([o[k] for o in outs]) / (3 if k != "confusion" else 1)) for k in ["acc", "f1", "l1", "confusion"]}
 
 def main():
 	args = get_args()
+	"""
 	p = pv.Plotter(off_screen = True, window_size = (224, 224))
 	p.add_mesh(pv.read("./meshes/Airway_Phantom_AdjustSmooth.stl"))
 	all_cls = load_all_cls_npy("./seg_cl_1")
 	all_cl_sums = get_cl_dist_sum(all_cls)
+	"""
 	print(args.ckpt_path)
 	if args.four_fold:
 		args.num_classes = 4
-	val_set = PreloadDataset(os.path.join(args.base_path, f"{args.val_path}_img.npy"), os.path.join(args.base_path, f"{args.val_path}_label.npy"), get_transform(False, args), args)
-	print("Val load done.", flush = True)
-	val_loader = DataLoader(val_set, batch_size = args.batch_size, num_workers = args.num_workers, shuffle = False)
+
 	model = get_model(args)
 	model = model.to(args.device)
 	model.load_state_dict(torch.load(os.path.join(args.save_path, args.ckpt_path)))
 	model.eval()
+
+	print("Val confirmed:")
+	print(outit(get_serial("val", model, args)))
+
+	print("Val all:")
+	print(outit(get_serial("val_all", model, args)))
+
+	ds = []
+	#print("Val REAL-0")
+	ds.append(get_serial("val_all_0", model, args, smooth = True)[1])
+
+	#print("Val REAL-1")
+	ds.append(get_serial("val_all_1", model, args, smooth = True)[1])
+
+	#print("Val REAL-2")
+	ds.append(get_serial("val_all_2", model, args, smooth = True)[1])
+
+	print("Smoothed:")
+	print(outit(merge_multi(ds)))
+
+
+def depr():
 
 	y_true, y_pred = [], []
 	coord_trues, coord_preds = [], []
