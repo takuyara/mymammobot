@@ -1160,6 +1160,31 @@ def show_fix_results():
 		d = np.load(path)
 		print(path.replace(".npy", ""), round(np.mean(d), 4), round(np.std(d), 4), len(d))
 
+def fix_pos_difference():
+	confirmed_dst, all_dst = [], []
+	with open("aggred_res.csv", newline = "") as f:
+		reader = csv.DictReader(f)
+		for row in tqdm(reader):
+			em_idx, img_idx, human_eval = int(row["em_idx"]), int(row["img_idx"]), int(row["human_eval"])
+			position, orientation, up = str_to_arr(row["position"]), str_to_arr(row["orientation"]), str_to_arr(row["up"])
+			position_em = np.loadtxt(os.path.join("./depth-images", f"EM-{em_idx}", f"{img_idx:06d}.txt")).reshape(-1)[ : 3]
+			dst = np.linalg.norm(position - position_em)
+			if human_eval == 1:
+				confirmed_dst.append(dst)
+			all_dst.append(dst)
+
+	print(np.mean(confirmed_dst), np.std(confirmed_dst))
+	print(np.mean(all_dst), np.std(all_dst))
+	plt.figure(figsize = (5.5, 4.7))
+	plt.hist(confirmed_dst, range = (0, 20))
+	plt.xlabel("EM-GT position distance (mm)", fontsize = 15)
+	plt.ylabel("Counts", fontsize = 15)
+	plt.show()
+	plt.figure(figsize = (5.5, 4.7))
+	plt.hist(all_dst, range = (0, 20), density = True)
+	plt.xlabel("EM-GT position distance (mm)", fontsize = 15)
+	plt.ylabel("Counts", fontsize = 15)
+	plt.show()
 
 
 if __name__ == '__main__':
@@ -1227,5 +1252,6 @@ if __name__ == '__main__':
 	
 	#plot_sfs_vs_mesh_range()
 	#plot_sfs_vs_mesh_histogram()
-	plot_fixing_results()
+	#plot_fixing_results()
 	#show_fix_results()
+	fix_pos_difference()

@@ -332,8 +332,10 @@ class ClsRegModel(nn.Module):
 			w_lg = F.sigmoid(((x1 - hv) / self.v_range) * self.sgm_scale)
 			totally_white = torch.ones_like(x1)
 			with torch.no_grad():
-				w_sm = self.mask_extractor(w_lg)[0]
-				totally_white = self.mask_extractor(totally_white)[0]
+				w_sm = self.mask_extractor(w_lg)
+				totally_white = self.mask_extractor(totally_white)
+				if self.training:
+					w_sm, totally_white = w_sm[0], totally_white[0]
 			w_sm = w_sm.view(w_sm.size(0), -1, self.pool_input_size, self.pool_input_size)[ : , 0 : 1, ...]
 			totally_white = totally_white.view(totally_white.size(0), -1, self.pool_input_size, self.pool_input_size)[ : , 0 : 1, ...]
 			w_sm = w_sm / totally_white
