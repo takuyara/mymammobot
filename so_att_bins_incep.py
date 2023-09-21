@@ -349,7 +349,9 @@ class ClsRegModel(nn.Module):
 
 		if self.batch_norm is not None:
 			x = self.batch_norm(x)
-		x = self.base(x.repeat(1, self.n_channels, 1, 1))[0]
+		x = self.base(x.repeat(1, self.n_channels, 1, 1))
+		if self.training:
+			x = x[0]
 		#print("Forward: ", x.shape)
 		x = self.base_pool(x, w_sm)
 		#print(x.shape)
